@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useFloorStore } from '../../store/useFloorStore'
+import { isTableObjectType } from '../../utils/objectLibrary'
 
 const InputRow = ({ label, children }) => (
   <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -16,6 +17,7 @@ export const InspectorPanel = () => {
   const exportLayout = useFloorStore((state) => state.exportLayout)
   const loadLayout = useFloorStore((state) => state.loadLayout)
   const duplicateSelectedObject = useFloorStore((state) => state.duplicateSelectedObject)
+  const openWaiterForTable = useFloorStore((state) => state.openWaiterForTable)
   const editorMode = useFloorStore((state) => state.editorMode)
   const canEdit = editorMode === 'edit'
 
@@ -23,6 +25,7 @@ export const InspectorPanel = () => {
   const [feedback, setFeedback] = useState('')
 
   const exportPreview = useMemo(() => exportLayout(), [exportLayout])
+  const isTable = selectedObject ? isTableObjectType(selectedObject.type) : false
 
   const onLoad = () => {
     try {
@@ -147,19 +150,23 @@ export const InspectorPanel = () => {
               />
             </InputRow>
 
-            <InputRow label="Seats">
-              <input
-                className="rounded-md border border-slate-200 px-2 py-1"
-                type="number"
-                value={selectedObject.metadata?.seats ?? 0}
-                disabled={!canEdit}
-                onChange={(event) =>
-                  updateObject(selectedObject.id, {
-                    metadata: { seats: Number(event.target.value) },
-                  })
-                }
-              />
-            </InputRow>
+            {isTable ? (
+              <InputRow label="Max Seats">
+                <input
+                  className="rounded-md border border-slate-200 px-2 py-1"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={selectedObject.metadata?.seats ?? 1}
+                  disabled={!canEdit}
+                  onChange={(event) =>
+                    updateObject(selectedObject.id, {
+                      metadata: { seats: Number(event.target.value) },
+                    })
+                  }
+                />
+              </InputRow>
+            ) : null}
 
             <button
               type="button"
@@ -169,6 +176,16 @@ export const InspectorPanel = () => {
             >
               Duplicate Selected
             </button>
+
+            {!canEdit && isTable ? (
+              <button
+                type="button"
+                className="w-full rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500"
+                onClick={() => openWaiterForTable(selectedObject.id)}
+              >
+                Manage Table
+              </button>
+            ) : null}
           </>
         ) : (
           <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">

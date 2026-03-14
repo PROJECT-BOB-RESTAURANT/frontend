@@ -1,4 +1,5 @@
 import { OBJECT_LIBRARY } from '../../utils/objectLibrary'
+import { isTableObjectType } from '../../utils/objectLibrary'
 import { useFloorStore } from '../../store/useFloorStore'
 import { LibraryItem } from './LibraryItem'
 import { useState } from 'react'
@@ -17,6 +18,7 @@ export const ObjectLibrary = () => {
 
   const [layoutText, setLayoutText] = useState('')
   const [layoutFeedback, setLayoutFeedback] = useState('')
+  const isTable = selectedObject ? isTableObjectType(selectedObject.type) : false
 
   const downloadLayout = () => {
     const data = exportLayout()
@@ -155,6 +157,24 @@ export const ObjectLibrary = () => {
                   }
                 />
               </label>
+
+              {isTable ? (
+                <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Max Seats
+                  <input
+                    className="rounded-md border border-slate-200 px-2 py-1"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={selectedObject.metadata?.seats ?? 1}
+                    onChange={(event) =>
+                      updateObject(selectedObject.id, {
+                        metadata: { seats: Number(event.target.value) },
+                      })
+                    }
+                  />
+                </label>
+              ) : null}
 
               <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Anchor

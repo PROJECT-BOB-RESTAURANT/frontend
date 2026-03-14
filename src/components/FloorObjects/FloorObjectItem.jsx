@@ -4,6 +4,7 @@ import { CSS } from '@dnd-kit/utilities'
 import clsx from 'clsx'
 import { ObjectRenderer } from './ObjectRenderer'
 import { getAnchorOrigin, snapToGrid } from '../../utils/grid'
+import { isTableObjectType } from '../../utils/objectLibrary'
 
 const FloorObjectItemComponent = ({
   object,
@@ -57,9 +58,15 @@ const FloorObjectItemComponent = ({
   const scaleX = object.scaleX ?? 1
   const scaleY = object.scaleY ?? 1
   const label = object.metadata?.label ?? object.type
+  const isTable = isTableObjectType(object.type)
+  const seats = Math.max(1, Math.round(Number(object.metadata?.seats ?? 1)))
   const labelStyle = {
     transform: `translate(-50%, -50%) scale(${1 / scaleX}, ${1 / scaleY})`,
     transformOrigin: 'center center',
+  }
+  const seatBadgeStyle = {
+    transform: `translate(50%, 50%) scale(${1 / scaleX}, ${1 / scaleY})`,
+    transformOrigin: 'bottom right',
   }
 
   return (
@@ -95,6 +102,15 @@ const FloorObjectItemComponent = ({
       >
         {label}
       </div>
+
+      {isTable ? (
+        <div
+          className="pointer-events-none absolute bottom-0 right-0 z-20 rounded-full bg-slate-900/85 px-2 py-0.5 text-[10px] font-semibold text-white"
+          style={seatBadgeStyle}
+        >
+          {seats} seats
+        </div>
+      ) : null}
     </div>
   )
 }

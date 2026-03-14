@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import clsx from 'clsx'
+import { isTableReservedNow } from '../../utils/reservations'
 
 const frame =
   'flex h-full w-full items-center justify-center overflow-hidden rounded-md border text-xs font-semibold uppercase tracking-wide'
@@ -7,6 +8,7 @@ const frame =
 const ObjectRendererComponent = ({ object }) => {
   const fillColor = object.metadata?.fillColor
   const strokeColor = object.metadata?.strokeColor
+  const reservedNow = isTableReservedNow(object.metadata)
 
   const colorStyle =
     fillColor || strokeColor
@@ -17,10 +19,28 @@ const ObjectRendererComponent = ({ object }) => {
       : undefined
 
   if (object.type === 'round_table') {
+    const roundStyle = {
+      backgroundColor: reservedNow ? '#fecaca' : '#bbf7d0',
+      borderColor: reservedNow ? '#be123c' : '#15803d',
+    }
+
     return (
       <div
-        className="relative h-full w-full rounded-full border-2 border-emerald-700 bg-emerald-200"
-        style={colorStyle}
+        className="relative h-full w-full rounded-full border-2"
+        style={roundStyle}
+      />
+    )
+  }
+
+  if (object.type === 'square_table' || object.type === 'large_table') {
+    return (
+      <div
+        className="flex h-full w-full items-center justify-center overflow-hidden rounded-md border text-xs font-semibold uppercase tracking-wide"
+        style={{
+          backgroundColor: reservedNow ? '#fecaca' : '#bbf7d0',
+          borderColor: reservedNow ? '#be123c' : '#15803d',
+          color: reservedNow ? '#881337' : '#166534',
+        }}
       />
     )
   }
@@ -72,8 +92,6 @@ const ObjectRendererComponent = ({ object }) => {
       className={clsx(frame, {
         'border-amber-700 bg-amber-100 text-amber-900': object.type === 'bar_desk',
         'border-slate-700 bg-slate-200 text-slate-700': object.type === 'kitchen_block',
-        'border-indigo-700 bg-indigo-100 text-indigo-900': object.type === 'large_table',
-        'border-emerald-700 bg-emerald-100 text-emerald-900': object.type === 'square_table',
         'border-rose-700 bg-rose-100 text-rose-900': object.type === 'custom_rectangle',
       })}
       style={colorStyle}

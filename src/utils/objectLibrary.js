@@ -6,6 +6,18 @@ const createBase = (type, width, height, metadata = {}) => ({
   metadata,
 })
 
+export const TABLE_OBJECT_TYPES = ['square_table', 'round_table', 'large_table']
+
+const TABLE_DEFAULT_SEATS = {
+  square_table: 4,
+  round_table: 4,
+  large_table: 8,
+}
+
+export const isTableObjectType = (type) => TABLE_OBJECT_TYPES.includes(type)
+
+export const getDefaultSeatsForType = (type) => TABLE_DEFAULT_SEATS[type] ?? 4
+
 export const OBJECT_LIBRARY = [
   {
     id: 'square_table',
