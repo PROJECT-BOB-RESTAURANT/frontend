@@ -1,249 +1,464 @@
 # Restaurant Floor Planner
 
-Restaurant layout planning app built with React + Vite. The app supports:
+Restaurant Floor Planner is a React + Vite app that combines floor-layout design, waiter table operations, and guest booking in one interface.
 
-- Multiple restaurants
-- Per-restaurant floor management
-- Per-floor drag-and-drop object editing
-- JSON import/export for layouts
+The current build is frontend-first (Zustand in-memory state), structured so backend APIs can be introduced incrementally.
 
-## 1. Tech Stack
+## 1. Product Snapshot
 
-- React 19
-- Zustand for global app/editor state
-- dnd-kit for drag and drop
-- Tailwind CSS v4 via `@tailwindcss/vite`
-- Vite for build/dev tooling
+Current capabilities:
+- Multi-restaurant management with isolated data contexts.
+- Per-restaurant floor management and canvas editing.
+- Table metadata with seat counts and labels.
+- Waiter table management (orders + reservations + occupancy).
+- Guest reservation flow (restaurant -> floor -> table -> booking).
+- Restaurant operations setup (workers, opening hours, nested menu catalog).
 
-## 2. High-Level Flow
+Main user groups:
+- Planner or manager: builds restaurant layout and operational metadata.
+- Waiter or floor staff: manages table orders and reservation states.
+- Guest or host operator: creates new bookings quickly.
 
-The app has 3 top-level screens controlled by `page` in the store:
+## 2. Quick Start
 
-1. `restaurant-management`
-	 Pick/create/rename/delete restaurants.
-2. `management`
-	 Manage floors for the currently active restaurant.
-3. `editor`
-	 Edit a specific floor on the canvas.
-
-User journey:
-
-1. Open restaurant
-2. Choose a floor
-3. Enter editor
-4. Drag objects from library to canvas
-5. Tune object properties in side panels
-6. Save/load/export/import layout
-
-## 3. Project Map (File-Tagged)
-
-### Core Entry
-
-- `src/main.jsx`
-	React bootstrap, mounts `<App />`.
-- `src/App.jsx`
-	Top-level route-like UI switching between restaurant page, floor page, and editor page. Also hosts `DndContext` and drag-end logic.
-- `src/index.css`
-	Global styles, font setup, Tailwind import.
-
-### State Layer
-
-- `src/store/useFloorStore.js`
-	Single source of truth for:
-	- Restaurants
-	- Floors per restaurant
-	- Current editor state (selected object, zoom, pan, mode)
-	- CRUD actions for restaurants/floors/objects
-	- Export/import behavior
-
-### Editor UI
-
-- `src/components/Canvas/CanvasEditor.jsx`
-	Canvas viewport, background grid, pan/zoom interactions, droppable target.
-- `src/components/Sidebar/ObjectLibrary.jsx`
-	Left panel for object presets and floor-level actions (snap toggle, save/load/export/import).
-- `src/components/Sidebar/LibraryItem.jsx`
-	Draggable source item for object presets.
-- `src/components/Inspector/InspectorPanel.jsx`
-	Right panel for selected object property editing + JSON panel.
-- `src/components/FloorObjects/FloorObjectItem.jsx`
-	Render wrapper for placed object instance, handles object dragging and selection.
-- `src/components/FloorObjects/ObjectRenderer.jsx`
-	Visual renderer for each object type (table, stairs, door, etc).
-
-### Hooks + Utilities
-
-- `src/hooks/useKeyboardShortcuts.js`
-	Global keyboard behavior (`Delete/Backspace`, `Ctrl/Cmd + D`).
-- `src/utils/grid.js`
-	Grid utilities (`snapToGrid`, `toWorldPoint`, `clamp`, anchor origin mapping).
-- `src/utils/objectLibrary.js`
-	Object preset catalog and lookup helpers.
-
-## 4. State Model Explained
-
-Defined in `src/store/useFloorStore.js`.
-
-Key state slices:
-
-- `page`: active screen (`restaurant-management` | `management` | `editor`)
-- `restaurants`: list of restaurant records
-- `currentRestaurantId`: active restaurant context
-- `floors`: active restaurant floors loaded into workspace
-- `currentFloorId`: floor currently open in editor context
-- `objects`: object instances for the currently loaded floor
-- `selectedObjectId`: selected object for property editing
-- `canvasZoom`, `canvasPosition`: camera/viewport state
-- `editorMode`: `view` or `edit`
-- `snapEnabled`: toggles grid snapping
-
-Important design choice:
-
-- The store keeps a working floor/object set in memory for fast editing.
-- Before context switches (floor or restaurant switch, back navigation), helper functions persist current working changes back into the right restaurant/floor record.
-
-This avoids losing in-progress changes while moving between screens.
-
-## 5. Drag-and-Drop Pipeline
-
-### Source types
-
-- Library item drag (`source: 'library'`): create new object from preset
-- Canvas item drag (`source: 'canvas'`): move existing object
-
-### Lifecycle
-
-1. `DndContext` in `src/App.jsx` captures `onDragEnd`
-2. Drop target must be canvas droppable id `floor-canvas`
-3. For library drops:
-	 - Read preset from `src/utils/objectLibrary.js`
-	 - Convert screen coords to world coords via `toWorldPoint` (`src/utils/grid.js`)
-	 - Center object under cursor
-	 - Optionally snap
-	 - Call `addObjectFromPreset`
-4. For canvas drags:
-	 - Convert delta by zoom
-	 - Optionally snap
-	 - Call `moveObjectByDelta`
-
-## 6. Rendering and Performance Notes
-
-- `FloorObjectItem` and `ObjectRenderer` are memoized (`memo`) to reduce unnecessary rerenders.
-- Zustand selectors are used per-field to limit subscription updates.
-- Object visual rendering is separated from interaction wrapper, making it easier to optimize or replace visuals independently.
-
-## 7. JSON Import/Export Behavior
-
-Current export/import in `src/store/useFloorStore.js` is floor-layout oriented:
-
-- Export includes current restaurant metadata plus floors payload.
-- Import supports:
-	- Legacy schema with top-level `objects`
-	- Current schema with `floors`
-
-Import updates floors for the currently active restaurant.
-
-## 8. How To Run
+Install and run development server:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Build production bundle:
+Build and preview production output:
 
 ```bash
 npm run build
 npm run preview
 ```
 
-## 9. Quick Start
+## 3. Current Uses
 
-Use this if you want to get productive in under 2 minutes.
+## 3.1 Planning Workflow
 
-1. Start the app:
+Use the app to set up a restaurant for service:
+1. Create restaurant.
+2. Add floors.
+3. Open floor editor.
+4. Place objects and tables.
+5. Set table seats and labels.
 
-```bash
-npm install
-npm run dev
-```
+## 3.2 Operations Workflow
 
-2. Open the browser URL printed by Vite.
-3. On the `Restaurants` page, click `Add New Restaurant`.
-4. Open that restaurant and click `Add New Floor`.
-5. Click `Edit` on a floor to enter the canvas editor.
-6. Drag objects from the left sidebar onto the canvas.
-7. Select an object and edit properties in the right inspector.
-8. Use `Save`/`Load`/`Export`/`Import` in the left panel to persist layouts.
+Use waiter mode for in-service table operations:
+1. Open table in waiter manager.
+2. Add catalog or custom order items.
+3. Set worker attribution.
+4. Add reservations or manual occupancy.
+5. Monitor timeline and table status.
+
+## 3.3 Booking Workflow
+
+Use guest reservation page to create bookings:
+1. Select restaurant.
+2. Select floor.
+3. Select table.
+4. Enter guest details and time range.
+5. Submit reservation.
+
+## 4. How The App Works
+
+## 4.1 Navigation Model
+
+The app uses store-driven page state (not React Router).
+
+Defined page values:
+- `restaurant-management`
+- `management`
+- `editor`
+- `waiter-management`
+- `guest-reservation`
+
+Key files:
+- `src/App.jsx`: top-level page rendering + drag/drop event coordination.
+- `src/store/useFloorStore.js`: navigation actions and all domain state.
+
+## 4.2 State and Domain Model
+
+State is centralized in Zustand (`src/store/useFloorStore.js`).
+
+Top-level entities:
+- `restaurant`: contains floors, workers, opening hours, menu tree.
+- `floor`: contains canvas parameters and floor objects.
+- `floor object`: geometry + metadata; table objects hold seats/orders/reservations.
+- `worker`: name + role for assignment and attribution.
+- `goods catalog`: nested folders and priced menu items.
+- `reservation`: time-range booking tied to a table object.
+- `order line`: table-bound item with qty, status, price, worker attribution.
+
+Important runtime behavior:
+- Active floor edits are persisted back to current restaurant when navigating.
+- Restaurant switching isolates each restaurant dataset.
+- Data currently lives in frontend memory (no API persistence yet).
+
+## 4.3 Layout Editor Flow
+
+Layout flow:
+1. Open restaurant -> floor -> editor.
+2. Drag object preset from library to canvas.
+3. Move/resize/rotate objects.
+4. Edit metadata in inspector (including table seats).
+5. Export/import floor data as needed.
+
+Technical notes:
+- Canvas interactions are handled through `dnd-kit`.
+- Grid snapping and zoom/position are managed via store state.
+
+## 4.4 Waiter Flow
+
+Waiter panel has two operation sections:
+- `orders`: add catalog/custom items, adjust qty/status/price, assign worker.
+- `reservations`: add/remove/extend reservations, manual occupancy control, timeline view.
+
+Status behavior:
+- Table shown as free (green) when no active reservation/manual occupancy.
+- Table shown as occupied/reserved (red) when active reservation or manual occupancy exists.
+
+## 4.5 Reservation and Occupancy Rules
+
+Current implemented rules:
+- Default reservation duration: 3 hours when end time is omitted or invalid.
+- Reservation party size is clamped to minimum 1.
+- Multiple reservations can exist per table.
+- Reservation timeline can be inspected per selected day.
+- Manual occupancy can be set, extended, and cleared.
+
+## 5. Options Available in the UI
+
+## 5.1 Restaurant Management Options
+
+From restaurants view:
+- Add restaurant
+- Rename restaurant
+- Delete restaurant
+- Open management/floors
+- Open guest reservation page
+
+From restaurant management panel:
+- Manage workers (add/update/remove)
+- Manage opening hours per day
+- Mark day as closed
+- Manage nested menu folders
+- Manage menu items with pricing
+
+## 5.2 Floor and Editor Options
+
+From floor management:
+- Add floor
+- Rename floor
+- Delete floor
+- Open editor
+
+From editor:
+- Switch edit/view mode
+- Place object presets
+- Move objects
+- Edit object dimensions and metadata
+- Set table seats
+- Toggle snapping
+- Export and import floor data
 
 Keyboard shortcuts:
-
-- `Delete` / `Backspace`: delete selected object
+- `Delete` or `Backspace`: delete selected object
 - `Ctrl/Cmd + D`: duplicate selected object
 
-Canvas controls:
+## 5.3 Waiter Options
 
-- Mouse wheel: pan canvas
-- `Ctrl + wheel`: zoom canvas
-- Drag empty canvas space: pan canvas
+Order operations:
+- Add custom order line
+- Add menu item line
+- Increment/decrement quantity
+- Set status
+- Set unit price
+- Assign worker
+- Remove order line
+- Clear all table orders
 
-## 10. How To Modify or Extend
+Reservation operations:
+- Add reservation with guest details
+- Remove reservation
+- Extend reservation by minutes
+- Mark table occupied (quick duration)
+- Extend manual occupancy
+- Clear manual occupancy
+- View day timeline with current-time marker
 
-### Add a new object type
+## 5.4 Guest Reservation Options
 
-1. Add preset in `src/utils/objectLibrary.js`:
-	 - new `id`
-	 - `label`
-	 - default `config` (size, metadata)
-2. Add visual branch in `src/components/FloorObjects/ObjectRenderer.jsx` based on `object.type`.
-3. Optional: add extra metadata controls in:
-	 - `src/components/Sidebar/ObjectLibrary.jsx`
-	 - `src/components/Inspector/InspectorPanel.jsx`
+Guest page options:
+- Select restaurant/floor/table
+- Enter guest name
+- Enter party size
+- Pick start and end time
+- Add optional note
+- Submit with inline success/error feedback
 
-### Add a new editable property
+## 6. How It Should Work (Behavior Contract)
 
-1. Store value in object `metadata` via `updateObject` in `src/store/useFloorStore.js`.
-2. Add input control in inspector/sidebar.
-3. Use the new metadata in `ObjectRenderer`.
-4. Ensure export/import naturally carries it via `metadata` object.
+Use these rules as the product contract for future work.
 
-### Add a new page-level mode
+## 6.1 Isolation and Scoping
 
-1. Extend `page` options in `src/store/useFloorStore.js`.
-2. Add action(s) that set the new page.
-3. Add branch in `src/App.jsx` rendering the page.
+- Restaurant data must stay isolated.
+- Floor, object, worker, menu, reservation, and order operations are always scoped to current restaurant.
+- Switching context must not leak or overwrite other restaurants.
 
-### Persist restaurants/floors remotely (API)
+## 6.2 Table Integrity
 
-1. Keep current store actions as UI-level intent.
-2. Replace or augment persistence helpers with async calls.
-3. Introduce loading/error state at store level.
-4. Keep a normalization step before writing to state.
+- Only table-like object types accept reservation/order operations.
+- Seat count should always resolve to at least 1 for table objects.
 
-### Add undo/redo
+## 6.3 Reservation Integrity
 
-1. Add `history` and `future` stacks in `src/store/useFloorStore.js`.
-2. Push snapshots on mutating actions (`addObject`, `updateObject`, delete, floor operations).
-3. Add `undo`/`redo` actions and keyboard shortcuts in `src/hooks/useKeyboardShortcuts.js`.
+- End time must be after start time.
+- Missing/invalid end time defaults to start + 3h.
+- Timeline view should render reservations overlapping selected day.
+- Current occupancy status must be time-correct.
 
-## 11. Conventions Used
+## 6.4 Order Integrity
 
-- Object IDs: generated with `crypto.randomUUID` prefixing (`obj_`, `floor_`, `restaurant_`).
-- Coordinates/sizes: stored in world units, often snapped to grid.
-- Metadata-first extensibility: extra object properties live in `metadata` to avoid rigid schema growth.
-- UI concern split:
-	- Canvas interaction
-	- Object rendering
-	- Property editing
-	- Store orchestration
+- Quantity cannot go below 1.
+- Price cannot be negative.
+- Worker assignment is optional but must remain stable on updates.
+- Clear-all actions should not affect reservations.
 
-## 12. Troubleshooting
+## 6.5 Opening Hours Integrity
 
-- Objects not dropping on canvas:
-	Check `DndContext` and canvas droppable id `floor-canvas` in `src/App.jsx` and `src/components/Canvas/CanvasEditor.jsx`.
-- Unexpected object jump while dragging:
-	Verify zoom conversion and snap logic in `src/App.jsx` and `src/utils/grid.js`.
-- Imported layout not loading:
-	Confirm JSON has either `objects` (legacy) or `floors` (current schema).
-- Changes lost when switching context:
-	Inspect persistence helpers in `src/store/useFloorStore.js` (`persistCurrentFloor`, restaurant persistence helpers).
+- Closed days should not require valid open/close values.
+- Open days should carry valid open and close times.
+
+## 6.6 UX Integrity
+
+- Navigating between pages should preserve active work state.
+- Waiter panel should clearly distinguish order tools from reservation tools.
+- Table color should instantly reflect occupancy state changes.
+
+## 7. Scenarios
+
+## 7.1 Scenario: Onboarding a New Restaurant
+
+Goal:
+- Bring a new location from empty to operational.
+
+Steps:
+1. Create restaurant `City Center`.
+2. Add floors `Main Hall` and `Terrace`.
+3. Add workers (2 waiters, 1 manager).
+4. Configure opening hours, mark Sunday closed.
+5. Add menu folders and items.
+
+Expected outcome:
+- Restaurant is operationally configured and ready for layout editing + service.
+
+## 7.2 Scenario: Designing Service Layout
+
+Goal:
+- Prepare table map for dinner shift.
+
+Steps:
+1. Open `Main Hall` in editor.
+2. Add table objects and non-table structure objects.
+3. Set seats and labels per table.
+4. Save/export floor data.
+
+Expected outcome:
+- Accurate service map with valid table metadata.
+
+## 7.3 Scenario: Active Service Table Handling
+
+Goal:
+- Run full waiter interaction on one table.
+
+Steps:
+1. Open table in waiter manager.
+2. Choose worker attribution.
+3. Add two catalog items and one custom item.
+4. Mark one line served.
+5. Adjust one line quantity and price.
+
+Expected outcome:
+- Orders reflect current service state and remain editable.
+
+## 7.4 Scenario: Reservation Traffic Window
+
+Goal:
+- Manage overlapping time windows across one evening.
+
+Steps:
+1. Add reservation 18:00-21:00.
+2. Add second reservation 21:30-23:00.
+3. Extend first by 30 minutes.
+4. Switch timeline date and inspect bars.
+
+Expected outcome:
+- Timeline and table status remain consistent with time windows.
+
+## 7.5 Scenario: Walk-In Occupancy Without Reservation
+
+Goal:
+- Reflect real occupancy without a formal booking.
+
+Steps:
+1. Mark table manually occupied for 3h.
+2. Extend by 30m near the end.
+3. Clear occupancy when guests leave.
+
+Expected outcome:
+- Table status red while occupied, then green once cleared.
+
+## 7.6 Scenario: Guest Self-Booking
+
+Goal:
+- Allow booking from guest page with minimal friction.
+
+Steps:
+1. Open guest reservation page.
+2. Choose restaurant, floor, and table.
+3. Enter guest details and party size.
+4. Submit booking.
+
+Expected outcome:
+- Booking is created and appears in waiter reservation list/timeline.
+
+## 7.7 Scenario: Multi-Restaurant Isolation Regression Check
+
+Goal:
+- Verify no cross-restaurant data bleed after edits.
+
+Steps:
+1. Create Restaurant A and B.
+2. Add unique floors/workers/menu/reservations in A.
+3. Switch to B and validate independent datasets.
+
+Expected outcome:
+- No A data appears in B context.
+
+## 8. Extending The App With New Features
+
+This section is the implementation playbook for new features.
+
+## 8.1 Extension Pattern (Recommended)
+
+For almost every feature, follow this sequence:
+1. Add or extend domain shape in `useFloorStore`.
+2. Add store actions for create/read/update/delete behavior.
+3. Wire actions into page/component UI.
+4. Update helper utilities in `src/utils` if logic is shared.
+5. Add clear UX messaging and fallback states.
+6. Validate behavior with manual scenario tests.
+
+Why this pattern:
+- Keeps feature state transitions centralized.
+- Prevents one-off logic duplication in components.
+- Makes backend API integration easier later.
+
+## 8.2 Add a New Object Type
+
+Example: add a `bar_counter` object preset.
+
+Update locations:
+- `src/utils/objectLibrary.js`
+	- Add new preset in the catalog.
+	- Configure default size/metadata.
+- `src/components/FloorObjects/ObjectRenderer.jsx`
+	- Add visual rendering branch if needed.
+- `src/components/Inspector/InspectorPanel.jsx`
+	- Add editable fields if type needs custom metadata.
+
+Rules:
+- If object should support reservations/orders, include it in table-type logic.
+- If not, keep it non-table to avoid waiter operations.
+
+## 8.3 Add a New Restaurant-Level Module
+
+Example: add "delivery zones" management.
+
+Steps:
+1. Add `deliveryZones` to restaurant shape in store.
+2. Add actions (`addDeliveryZone`, `updateDeliveryZone`, `deleteDeliveryZone`).
+3. Create component under `src/components/Management/`.
+4. Mount component from restaurant management page.
+5. Add a scenario in this README and verify isolation across restaurants.
+
+## 8.4 Add a New Waiter Capability
+
+Example: add "split bill" support.
+
+Steps:
+1. Extend order model in `useFloorStore` with split metadata.
+2. Add pure helper functions for split calculations.
+3. Add UI in `src/components/Waiter/WaiterPanel.jsx`.
+4. Preserve existing order flow compatibility.
+5. Add edge-case scenario: split after partial serve.
+
+## 8.5 Add a New Page
+
+Current navigation is store-driven, so add a page by:
+1. Adding new `page` value in store.
+2. Adding open/back actions in store.
+3. Handling new branch in `src/App.jsx` page rendering.
+4. Ensuring state persistence behavior remains correct when navigating.
+
+## 8.6 Prepare for Backend Integration
+
+When replacing local store persistence with API calls:
+1. Keep domain model and action names stable where possible.
+2. Wrap API calls in a service/client layer (do not spread fetch calls across components).
+3. Make optimistic updates optional per feature.
+4. Keep error boundaries and user feedback consistent.
+5. Migrate screen by screen, not all at once.
+
+## 8.7 Extension Checklist
+
+Before shipping any new feature, confirm:
+- Restaurant scoping is preserved.
+- Existing scenarios still pass.
+- No table-status regression.
+- New options are documented in README.
+- Build passes (`npm run build`).
+
+## 9. Architecture and File Map
+
+- `src/App.jsx`: page orchestration and drag-drop bridge.
+- `src/store/useFloorStore.js`: central domain state + all mutations.
+- `src/components/Canvas/CanvasEditor.jsx`: drawing area and interactions.
+- `src/components/Sidebar/ObjectLibrary.jsx`: preset library and editor tools.
+- `src/components/Inspector/InspectorPanel.jsx`: selected-object editing.
+- `src/components/FloorObjects/ObjectRenderer.jsx`: object visuals and occupancy color.
+- `src/components/FloorObjects/FloorObjectItem.jsx`: per-object wrapper interactions.
+- `src/components/Management/RestaurantGoodsManager.jsx`: workers, opening hours, menu tree.
+- `src/components/Waiter/WaiterPanel.jsx`: waiter operations and timeline.
+- `src/components/Guest/GuestReservationPage.jsx`: guest booking entry.
+- `src/utils/objectLibrary.js`: preset definitions + table-type helpers.
+- `src/utils/reservations.js`: reservation normalization and active-state helpers.
+- `src/hooks/useKeyboardShortcuts.js`: keyboard handling for editor actions.
+
+## 10. Tech Stack
+
+- React 19
+- Zustand
+- dnd-kit
+- Tailwind CSS v4 via `@tailwindcss/vite`
+- Vite 7
+
+## 11. Known Limits
+
+- No backend API persistence yet.
+- No authentication/authorization yet.
+- No multi-user synchronization or conflict resolution yet.
+- No audit log/history for changes yet.
+
+## 12. Next Recommended Milestones
+
+1. Add backend APIs for restaurants/floors/objects.
+2. Persist reservations and orders server-side.
+3. Add auth and role permissions (manager/waiter/guest).
+4. Add automated tests for critical scenarios listed above.
