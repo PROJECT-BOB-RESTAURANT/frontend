@@ -69,7 +69,6 @@ Use modular, scalable structure:
 - `pages/` → route-level components
 - `services/` → API calls
 - `hooks/` → custom hooks
-- `types/` → TypeScript types/interfaces
 - `utils/` → helper functions
 
 Rules:
@@ -137,7 +136,7 @@ Every change must update `README.md`.
 - Use constructor injection only
 
 ### Frontend
-- Use TypeScript (mandatory)
+- Use JavaScript (mandatory)
 - Type all props and API responses
 - Handle loading and error states properly
 - Avoid unnecessary re-renders
