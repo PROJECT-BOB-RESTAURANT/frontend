@@ -28,12 +28,32 @@ npm install
 npm run dev
 ```
 
+Run backend and database before frontend for full API behavior:
+
+```bash
+cd ../database
+sudo docker compose up -d
+
+cd ../backend
+./mvnw spring-boot:run
+
+cd ../frontend
+npm run dev
+```
+
 Build and preview production output:
 
 ```bash
 npm run build
 npm run preview
 ```
+
+### API Base URL
+
+Frontend uses `VITE_API_BASE_URL` when provided.
+If not set, it defaults to `/api/v1`.
+
+In development, Vite proxies `/api/*` to `http://localhost:8080`.
 
 ## 3. Current Uses
 
@@ -132,6 +152,15 @@ Current implemented rules:
 - Manual occupancy can be set, extended, and cleared.
 
 ## 5. Options Available in the UI
+
+### Backend Integration Notes
+
+- Restaurant and floor create/rename/delete operations are connected to backend endpoints.
+- Worker and menu-folder/menu-item management is connected to backend endpoints.
+- Guest reservations are created through backend reservation endpoints.
+- Waiter orders and reservations are loaded and persisted through backend table/order/reservation endpoints.
+- Floor-object editing remains interactive in-canvas and is persisted with the `Save Floor Layout` button.
+- Opening-hours changes are persisted with the `Save Opening Hours` button.
 
 ## 5.1 Restaurant Management Options
 
