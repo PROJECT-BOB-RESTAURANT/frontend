@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useFloorStore } from '../../store/useFloorStore'
 import { getActiveReservation, isTableReservedNow, toDateMs } from '../../utils/reservations'
+import { backendApi } from '../../services/backendApi'
 
 const findFolderByPath = (folders, pathIds) => {
   let currentFolders = folders
@@ -46,6 +47,7 @@ const toDateInputValue = (date) => {
 export const WaiterPanel = () => {
   const waiterTableId = useFloorStore((state) => state.waiterTableId)
   const waiterWorkerId = useFloorStore((state) => state.waiterWorkerId)
+  const currentRestaurantId = useFloorStore((state) => state.currentRestaurantId)
   const currentRestaurant = useFloorStore((state) =>
     state.restaurants.find((restaurant) => restaurant.id === state.currentRestaurantId) ?? null,
   )
@@ -53,19 +55,8 @@ export const WaiterPanel = () => {
     state.objects.find((object) => object.id === state.waiterTableId) ?? null,
   )
   const backToEditorFromWaiter = useFloorStore((state) => state.backToEditorFromWaiter)
-  const addCatalogItemOrderToTable = useFloorStore((state) => state.addCatalogItemOrderToTable)
-  const addOrderToTable = useFloorStore((state) => state.addOrderToTable)
-  const incrementOrderQuantity = useFloorStore((state) => state.incrementOrderQuantity)
-  const decrementOrderQuantity = useFloorStore((state) => state.decrementOrderQuantity)
-  const setOrderStatus = useFloorStore((state) => state.setOrderStatus)
-  const setOrderUnitPrice = useFloorStore((state) => state.setOrderUnitPrice)
-  const removeOrderFromTable = useFloorStore((state) => state.removeOrderFromTable)
-  const clearTableOrders = useFloorStore((state) => state.clearTableOrders)
-  const setOrderWorker = useFloorStore((state) => state.setOrderWorker)
   const setWaiterWorker = useFloorStore((state) => state.setWaiterWorker)
-  const addTableReservation = useFloorStore((state) => state.addTableReservation)
-  const removeTableReservation = useFloorStore((state) => state.removeTableReservation)
-  const extendTableReservation = useFloorStore((state) => state.extendTableReservation)
+  const setTableServiceData = useFloorStore((state) => state.setTableServiceData)
   const setTableManualOccupied = useFloorStore((state) => state.setTableManualOccupied)
   const extendTableManualOccupied = useFloorStore((state) => state.extendTableManualOccupied)
   const clearTableManualOccupied = useFloorStore((state) => state.clearTableManualOccupied)
@@ -81,6 +72,8 @@ export const WaiterPanel = () => {
   const [reservationEnd, setReservationEnd] = useState(() => plusHoursLocalDateTime(3))
   const [reservationNote, setReservationNote] = useState('')
   const [timelineDate, setTimelineDate] = useState(() => toDateInputValue(new Date()))
+  const [isSaving, setIsSaving] = useState(false)
+  const [feedback, setFeedback] = useState('')
 
   const orders = table?.metadata?.orders ?? []
   const reservations = (table?.metadata?.reservations ?? []).slice().sort((a, b) => {
@@ -161,20 +154,122 @@ export const WaiterPanel = () => {
     return timelineDate === today
   }, [timelineDate])
 
-  const addReservation = () => {
-    addTableReservation(waiterTableId, {
-      guestName: reservationGuestName,
-      partySize: Number(reservationPartySize) || 1,
-      startAt: reservationStart,
-      endAt: reservationEnd,
-      note: reservationNote,
+  const refreshTableData = async () => {
+    if (!currentRestaurantId || !waiterTableId) return
+    const payload = await backendApi.fetchTableServiceState(currentRestaurantId, waiterTableId)
+    setTableServiceData(waiterTableId, payload)
+  }
+
+  useEffect(() => {
+    if (!currentRestaurantId || !waiterTableId) return
+
+    refreshTableData().catch((error) => {
+      setFeedback(error.message)
     })
+  }, [currentRestaurantId, waiterTableId])
+
+  const runMutation = async (operation, successMessage) => {
+    setIsSaving(true)
+    try {
+      await operation()
+      await refreshTableData()
+      if (successMessage) {
+        setFeedback(successMessage)
+      }
+    } catch (error) {
+      setFeedback(error.message)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const addReservation = () => {
+    runMutation(
+      () =>
+        backendApi.createReservation(currentRestaurantId, {
+          tableObjectId: waiterTableId,
+          guestName: reservationGuestName,
+          partySize: Number(reservationPartySize) || 1,
+          startAt: reservationStart,
+          endAt: reservationEnd,
+          note: reservationNote,
+        }),
+      'Reservation created.',
+    )
 
     setReservationGuestName('')
     setReservationPartySize('2')
     setReservationStart(nowLocalDateTime())
     setReservationEnd(plusHoursLocalDateTime(3))
     setReservationNote('')
+  }
+
+  const addOrderLine = (line) => {
+    runMutation(async () => {
+      const orderId = await backendApi.ensureOpenOrderId(
+        currentRestaurantId,
+        waiterTableId,
+        waiterWorkerId,
+      )
+
+      await backendApi.addOrderLine(currentRestaurantId, waiterTableId, orderId, line)
+    }, 'Order line added.')
+  }
+
+  const updateOrderLine = (order, updates) => {
+    if (!order?.tableOrderId) return
+    runMutation(
+      () =>
+        backendApi.updateOrderLine(
+          currentRestaurantId,
+          waiterTableId,
+          order.tableOrderId,
+          order.id,
+          {
+            name: updates.name ?? order.name,
+            quantity: updates.quantity ?? order.quantity,
+            unitPrice: updates.unitPrice ?? order.unitPrice,
+            note: updates.note ?? order.note,
+            status: updates.status ?? order.status,
+            placedByWorkerId:
+              updates.placedByWorkerId !== undefined
+                ? updates.placedByWorkerId
+                : order.placedByWorkerId,
+            placedByWorkerName:
+              updates.placedByWorkerName !== undefined
+                ? updates.placedByWorkerName
+                : order.placedByWorkerName,
+          },
+        ),
+      'Order line updated.',
+    )
+  }
+
+  const deleteOrderLine = (order) => {
+    if (!order?.tableOrderId) return
+    runMutation(
+      () =>
+        backendApi.deleteOrderLine(
+          currentRestaurantId,
+          waiterTableId,
+          order.tableOrderId,
+          order.id,
+        ),
+      'Order line removed.',
+    )
+  }
+
+  const clearOrders = () => {
+    const uniqueOrderIds = [...new Set(orders.map((order) => order.tableOrderId).filter(Boolean))]
+    runMutation(
+      () =>
+        Promise.all(
+          uniqueOrderIds.map((orderId) =>
+            backendApi.deleteTableOrder(currentRestaurantId, waiterTableId, orderId),
+          ),
+        ),
+      'Table orders cleared.',
+    )
   }
 
   if (!waiterTableId || !table) {
@@ -225,6 +320,8 @@ export const WaiterPanel = () => {
             {activeSection === 'orders' ? 'Open Reservations Menu' : 'Back To Orders Menu'}
           </button>
         </div>
+
+        {feedback ? <p className="mb-3 text-xs text-slate-600">{feedback}</p> : null}
 
         {activeSection === 'reservations' ? (
           <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -327,6 +424,7 @@ export const WaiterPanel = () => {
                 <button
                   type="button"
                   className="md:col-span-2 rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700"
+                  disabled={isSaving}
                   onClick={addReservation}
                 >
                   Add Reservation
@@ -422,14 +520,35 @@ export const WaiterPanel = () => {
                           <button
                             type="button"
                             className="ml-auto rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200"
-                            onClick={() => extendTableReservation(waiterTableId, reservation.id, 30)}
+                            onClick={() =>
+                              runMutation(
+                                () => {
+                                  const endMs = toDateMs(reservation.endAt) ?? Date.now()
+                                  const nextEnd = new Date(endMs + 30 * 60 * 1000).toISOString()
+                                  return backendApi.updateReservation(
+                                    currentRestaurantId,
+                                    reservation.id,
+                                    {
+                                      endAt: nextEnd,
+                                    },
+                                  )
+                                },
+                                'Reservation extended.',
+                              )
+                            }
                           >
                             Extend +30m
                           </button>
                           <button
                             type="button"
                             className="rounded-md bg-rose-100 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-200"
-                            onClick={() => removeTableReservation(waiterTableId, reservation.id)}
+                            onClick={() =>
+                              runMutation(
+                                () =>
+                                  backendApi.deleteReservation(currentRestaurantId, reservation.id),
+                                'Reservation removed.',
+                              )
+                            }
                           >
                             Remove
                           </button>
@@ -454,7 +573,7 @@ export const WaiterPanel = () => {
           <button
             type="button"
             className="rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-500"
-            onClick={() => clearTableOrders(waiterTableId)}
+            onClick={clearOrders}
           >
             Clear Table Orders
           </button>
@@ -523,7 +642,18 @@ export const WaiterPanel = () => {
                       key={item.id}
                       type="button"
                       className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-700"
-                      onClick={() => addCatalogItemOrderToTable(waiterTableId, activeFolder.id, item.id)}
+                      onClick={() =>
+                        addOrderLine({
+                          name: item.name,
+                          quantity: 1,
+                          unitPrice: item.price,
+                          note: '',
+                          status: 'pending',
+                          placedByWorkerId: waiterWorkerId,
+                          placedByWorkerName:
+                            workers.find((worker) => worker.id === waiterWorkerId)?.name ?? null,
+                        })
+                      }
                     >
                       + {item.name} <span className="text-slate-500">(${item.price.toFixed(2)})</span>
                     </button>
@@ -561,12 +691,16 @@ export const WaiterPanel = () => {
                 className="mt-2 w-full rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500"
                 onClick={() => {
                   if (!customItemName.trim()) return
-                  addOrderToTable(
-                    waiterTableId,
-                    customItemName,
-                    customNote,
-                    Math.max(0, Number(customPrice) || 0),
-                  )
+                  addOrderLine({
+                    name: customItemName,
+                    quantity: 1,
+                    unitPrice: Math.max(0, Number(customPrice) || 0),
+                    note: customNote,
+                    status: 'pending',
+                    placedByWorkerId: waiterWorkerId,
+                    placedByWorkerName:
+                      workers.find((worker) => worker.id === waiterWorkerId)?.name ?? null,
+                  })
                   setCustomItemName('')
                   setCustomNote('')
                   setCustomPrice('')
@@ -602,7 +736,7 @@ export const WaiterPanel = () => {
                         className="ml-auto rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
                         value={order.status}
                         onChange={(event) =>
-                          setOrderStatus(waiterTableId, order.id, event.target.value)
+                          updateOrderLine(order, { status: event.target.value })
                         }
                       >
                         <option value="pending">Pending</option>
@@ -618,7 +752,11 @@ export const WaiterPanel = () => {
                         className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
                         value={order.placedByWorkerId ?? ''}
                         onChange={(event) =>
-                          setOrderWorker(waiterTableId, order.id, event.target.value || null)
+                          updateOrderLine(order, {
+                            placedByWorkerId: event.target.value || null,
+                            placedByWorkerName:
+                              workers.find((worker) => worker.id === event.target.value)?.name ?? null,
+                          })
                         }
                       >
                         <option value="">Unassigned</option>
@@ -646,7 +784,7 @@ export const WaiterPanel = () => {
                         step="0.01"
                         value={Math.max(0, Number(order.unitPrice ?? 0))}
                         onChange={(event) =>
-                          setOrderUnitPrice(waiterTableId, order.id, Number(event.target.value))
+                          updateOrderLine(order, { unitPrice: Number(event.target.value) })
                         }
                       />
                     </div>
@@ -655,21 +793,28 @@ export const WaiterPanel = () => {
                       <button
                         type="button"
                         className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200"
-                        onClick={() => decrementOrderQuantity(waiterTableId, order.id)}
+                        onClick={() => {
+                          const nextQuantity = order.quantity - 1
+                          if (nextQuantity <= 0) {
+                            deleteOrderLine(order)
+                            return
+                          }
+                          updateOrderLine(order, { quantity: nextQuantity })
+                        }}
                       >
                         -
                       </button>
                       <button
                         type="button"
                         className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200"
-                        onClick={() => incrementOrderQuantity(waiterTableId, order.id)}
+                        onClick={() => updateOrderLine(order, { quantity: order.quantity + 1 })}
                       >
                         +
                       </button>
                       <button
                         type="button"
                         className="ml-auto rounded-md bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-200"
-                        onClick={() => removeOrderFromTable(waiterTableId, order.id)}
+                        onClick={() => deleteOrderLine(order)}
                       >
                         Remove
                       </button>

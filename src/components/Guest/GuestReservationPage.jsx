@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useFloorStore } from '../../store/useFloorStore'
 import { isTableObjectType } from '../../utils/objectLibrary'
+import { backendApi } from '../../services/backendApi'
 
 const toDateTimeLocal = (date) => {
   const year = date.getFullYear()
@@ -13,8 +14,16 @@ const toDateTimeLocal = (date) => {
 
 export const GuestReservationPage = () => {
   const restaurants = useFloorStore((state) => state.restaurants)
+  const currentRestaurantId = useFloorStore((state) => state.currentRestaurantId)
+  const currentFloorId = useFloorStore((state) => state.currentFloorId)
+  const page = useFloorStore((state) => state.page)
+  const editorMode = useFloorStore((state) => state.editorMode)
+  const waiterTableId = useFloorStore((state) => state.waiterTableId)
+  const waiterWorkerId = useFloorStore((state) => state.waiterWorkerId)
+  const selectedObjectId = useFloorStore((state) => state.selectedObjectId)
+  const hydrateFromBackend = useFloorStore((state) => state.hydrateFromBackend)
   const backToRestaurantManagement = useFloorStore((state) => state.backToRestaurantManagement)
-  const createGuestReservation = useFloorStore((state) => state.createGuestReservation)
+  const [isSaving, setIsSaving] = useState(false)
 
   const [restaurantId, setRestaurantId] = useState(restaurants[0]?.id ?? '')
   const [floorId, setFloorId] = useState('')
@@ -67,26 +76,39 @@ export const GuestReservationPage = () => {
       return
     }
 
-    const created = createGuestReservation({
-      restaurantId,
-      floorId,
-      tableId,
-      guestName,
-      partySize: Number(partySize) || 1,
-      startAt,
-      endAt,
-      note,
-    })
+    setIsSaving(true)
+    backendApi
+      .createReservation(restaurantId, {
+        tableObjectId: tableId,
+        guestName,
+        partySize: Number(partySize) || 1,
+        startAt,
+        endAt,
+        note,
+      })
+      .then(() => backendApi.fetchRestaurantsGraph())
+      .then((graph) => {
+        hydrateFromBackend(graph, {
+          currentRestaurantId,
+          currentFloorId,
+          page,
+          editorMode,
+          waiterTableId,
+          waiterWorkerId,
+          selectedObjectId,
+        })
 
-    if (!created) {
-      setFeedback('Unable to create reservation for selected table.')
-      return
-    }
-
-    setFeedback('Reservation created successfully.')
-    setGuestName('')
-    setPartySize('2')
-    setNote('')
+        setFeedback('Reservation created successfully.')
+        setGuestName('')
+        setPartySize('2')
+        setNote('')
+      })
+      .catch((error) => {
+        setFeedback(error.message)
+      })
+      .finally(() => {
+        setIsSaving(false)
+      })
   }
 
   return (
@@ -214,9 +236,10 @@ export const GuestReservationPage = () => {
           <button
             type="button"
             className="rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500"
+            disabled={isSaving}
             onClick={submitReservation}
           >
-            Create Reservation
+            {isSaving ? 'Saving...' : 'Create Reservation'}
           </button>
 
           {feedback ? <p className="text-xs text-slate-600">{feedback}</p> : null}
