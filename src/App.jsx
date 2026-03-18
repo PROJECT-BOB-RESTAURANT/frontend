@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { DndContext } from '@dnd-kit/core'
 import { CanvasEditor } from './components/Canvas/CanvasEditor'
 import { GuestReservationPage } from './components/Guest/GuestReservationPage'
@@ -5,6 +6,7 @@ import { InspectorPanel } from './components/Inspector/InspectorPanel'
 import { RestaurantGoodsManager } from './components/Management/RestaurantGoodsManager'
 import { ObjectLibrary } from './components/Sidebar/ObjectLibrary'
 import { WaiterPanel } from './components/Waiter/WaiterPanel'
+import { backendApi } from './services/backendApi'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useFloorStore } from './store/useFloorStore'
 import { getObjectPreset } from './utils/objectLibrary'
@@ -37,25 +39,98 @@ function App() {
   const snapEnabled = useFloorStore((state) => state.snapEnabled)
   const page = useFloorStore((state) => state.page)
   const editorMode = useFloorStore((state) => state.editorMode)
+  const hydrateFromBackend = useFloorStore((state) => state.hydrateFromBackend)
+  const applyCreatedObjectIds = useFloorStore((state) => state.applyCreatedObjectIds)
   const restaurants = useFloorStore((state) => state.restaurants)
   const currentRestaurantId = useFloorStore((state) => state.currentRestaurantId)
   const floors = useFloorStore((state) => state.floors)
   const currentFloorId = useFloorStore((state) => state.currentFloorId)
-  const createRestaurant = useFloorStore((state) => state.createRestaurant)
-  const renameRestaurant = useFloorStore((state) => state.renameRestaurant)
-  const deleteRestaurant = useFloorStore((state) => state.deleteRestaurant)
+  const objects = useFloorStore((state) => state.objects)
   const openRestaurant = useFloorStore((state) => state.openRestaurant)
   const openGuestReservationPage = useFloorStore((state) => state.openGuestReservationPage)
   const switchRestaurantInManagement = useFloorStore((state) => state.switchRestaurantInManagement)
   const switchRestaurantInEditor = useFloorStore((state) => state.switchRestaurantInEditor)
   const backToRestaurants = useFloorStore((state) => state.backToRestaurants)
-  const createFloor = useFloorStore((state) => state.createFloor)
-  const renameFloor = useFloorStore((state) => state.renameFloor)
-  const deleteFloor = useFloorStore((state) => state.deleteFloor)
   const openFloor = useFloorStore((state) => state.openFloor)
   const backToManagement = useFloorStore((state) => state.backToManagement)
   const switchFloorInEditor = useFloorStore((state) => state.switchFloorInEditor)
   const setEditorMode = useFloorStore((state) => state.setEditorMode)
+  const waiterTableId = useFloorStore((state) => state.waiterTableId)
+  const waiterWorkerId = useFloorStore((state) => state.waiterWorkerId)
+  const selectedObjectId = useFloorStore((state) => state.selectedObjectId)
+
+  const [isBackendLoading, setIsBackendLoading] = useState(false)
+  const [backendFeedback, setBackendFeedback] = useState('')
+
+  const currentFloor = floors.find((floor) => floor.id === currentFloorId) ?? null
+
+  const reloadFromBackend = async (message = '') => {
+    const graph = await backendApi.fetchRestaurantsGraph()
+    hydrateFromBackend(graph, {
+      currentRestaurantId,
+      currentFloorId,
+      page,
+      editorMode,
+      waiterTableId,
+      waiterWorkerId,
+      selectedObjectId,
+    })
+    if (message) {
+      setBackendFeedback(message)
+    }
+  }
+
+  useEffect(() => {
+    let active = true
+
+    const load = async () => {
+      setIsBackendLoading(true)
+      try {
+        const graph = await backendApi.fetchRestaurantsGraph()
+        if (!active) return
+        hydrateFromBackend(graph, {
+          page,
+          editorMode,
+        })
+        setBackendFeedback('Loaded data from backend.')
+      } catch (error) {
+        if (!active) return
+        setBackendFeedback(error.message)
+      } finally {
+        if (active) {
+          setIsBackendLoading(false)
+        }
+      }
+    }
+
+    load()
+
+    return () => {
+      active = false
+    }
+  }, [hydrateFromBackend])
+
+  const onSaveCurrentFloorLayout = async () => {
+    if (!currentRestaurantId || !currentFloor) return
+
+    const floorToSave = {
+      ...currentFloor,
+      objects,
+      canvasZoom,
+      canvasPosition,
+    }
+
+    setIsBackendLoading(true)
+    try {
+      const createdIdMap = await backendApi.saveFloorLayout(currentRestaurantId, floorToSave)
+      applyCreatedObjectIds(createdIdMap)
+      await reloadFromBackend('Floor layout saved to backend.')
+    } catch (error) {
+      setBackendFeedback(error.message)
+    } finally {
+      setIsBackendLoading(false)
+    }
+  }
 
   const currentRestaurant =
     restaurants.find((restaurant) => restaurant.id === currentRestaurantId) ?? null
@@ -128,12 +203,27 @@ function App() {
               <button
                 type="button"
                 className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
-                onClick={() => {
-                  const name = window.prompt('Restaurant name', `Restaurant ${restaurants.length + 1}`)
+                onClick={async () => {
+                  const name = window.prompt(
+                    'Restaurant name',
+                    `Restaurant ${restaurants.length + 1}`,
+                  )
                   if (!name) return
 
-                  const restaurantId = createRestaurant(name)
-                  openRestaurant(restaurantId)
+                  setIsBackendLoading(true)
+                  try {
+                    const created = await backendApi.createRestaurant(name)
+                    await reloadFromBackend('Restaurant created.')
+                    const restaurantId = created?.id ?? created
+                    if (restaurantId) {
+                      openRestaurant(restaurantId)
+                    }
+                  } catch (error) {
+                    setBackendFeedback(error.message)
+                  } finally {
+                    setIsBackendLoading(false)
+                  }
+
                 }}
               >
                 Add New Restaurant
@@ -142,6 +232,11 @@ function App() {
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
+            {restaurants.length === 0 ? (
+              <article className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600 md:col-span-2">
+                No restaurants found. Create your first restaurant with the "Add New Restaurant" button.
+              </article>
+            ) : null}
             {restaurants.map((restaurant) => (
               <article key={restaurant.id} className="rounded-xl border border-slate-200 bg-white p-4">
                 <h2 className="text-base font-bold text-slate-800">{restaurant.name}</h2>
@@ -168,10 +263,19 @@ function App() {
                   <button
                     type="button"
                     className="rounded-md bg-amber-500 px-2 py-1 text-xs font-semibold text-white hover:bg-amber-400"
-                    onClick={() => {
+                    onClick={async () => {
                       const nextName = window.prompt('Rename restaurant', restaurant.name)
                       if (!nextName) return
-                      renameRestaurant(restaurant.id, nextName)
+
+                      setIsBackendLoading(true)
+                      try {
+                        await backendApi.updateRestaurant(restaurant.id, nextName)
+                        await reloadFromBackend('Restaurant renamed.')
+                      } catch (error) {
+                        setBackendFeedback(error.message)
+                      } finally {
+                        setIsBackendLoading(false)
+                      }
                     }}
                   >
                     Rename
@@ -179,7 +283,17 @@ function App() {
                   <button
                     type="button"
                     className="rounded-md bg-rose-600 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-500"
-                    onClick={() => deleteRestaurant(restaurant.id)}
+                    onClick={async () => {
+                      setIsBackendLoading(true)
+                      try {
+                        await backendApi.deleteRestaurant(restaurant.id)
+                        await reloadFromBackend('Restaurant deleted.')
+                      } catch (error) {
+                        setBackendFeedback(error.message)
+                      } finally {
+                        setIsBackendLoading(false)
+                      }
+                    }}
                   >
                     Delete
                   </button>
@@ -214,7 +328,7 @@ function App() {
               <button
                 type="button"
                 className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
-                onClick={() => {
+                onClick={async () => {
                   const name = window.prompt('Floor name', `Floor ${floors.length + 1}`)
                   if (!name) return
                   const width = window.prompt('Optional floor width (leave empty to skip)', '')
@@ -224,8 +338,20 @@ function App() {
                       ? { width: Number(width) || null, height: Number(height) || null }
                       : null
 
-                  const floorId = createFloor(name, size)
-                  openFloor(floorId, 'edit')
+                  setIsBackendLoading(true)
+                  try {
+                    await backendApi.createFloor(currentRestaurantId, {
+                      name,
+                      size,
+                      canvasZoom: 1,
+                      canvasPosition: { x: 160, y: 90 },
+                    })
+                    await reloadFromBackend('Floor created.')
+                  } catch (error) {
+                    setBackendFeedback(error.message)
+                  } finally {
+                    setIsBackendLoading(false)
+                  }
                 }}
               >
                 Add New Floor
@@ -239,9 +365,10 @@ function App() {
             </label>
             <select
               className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-              value={currentRestaurantId}
+              value={currentRestaurantId ?? ''}
               onChange={(event) => switchRestaurantInManagement(event.target.value)}
             >
+              {restaurants.length === 0 ? <option value="">No restaurants</option> : null}
               {restaurants.map((restaurant) => (
                 <option key={restaurant.id} value={restaurant.id}>
                   {restaurant.name}
@@ -282,10 +409,22 @@ function App() {
                   <button
                     type="button"
                     className="rounded-md bg-amber-500 px-2 py-1 text-xs font-semibold text-white hover:bg-amber-400"
-                    onClick={() => {
+                    onClick={async () => {
                       const nextName = window.prompt('Rename floor', floor.name)
                       if (!nextName) return
-                      renameFloor(floor.id, nextName)
+
+                      setIsBackendLoading(true)
+                      try {
+                        await backendApi.updateFloor(currentRestaurantId, floor.id, {
+                          ...floor,
+                          name: nextName,
+                        })
+                        await reloadFromBackend('Floor renamed.')
+                      } catch (error) {
+                        setBackendFeedback(error.message)
+                      } finally {
+                        setIsBackendLoading(false)
+                      }
                     }}
                   >
                     Rename
@@ -293,7 +432,17 @@ function App() {
                   <button
                     type="button"
                     className="rounded-md bg-rose-600 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-500"
-                    onClick={() => deleteFloor(floor.id)}
+                    onClick={async () => {
+                      setIsBackendLoading(true)
+                      try {
+                        await backendApi.deleteFloor(currentRestaurantId, floor.id)
+                        await reloadFromBackend('Floor deleted.')
+                      } catch (error) {
+                        setBackendFeedback(error.message)
+                      } finally {
+                        setIsBackendLoading(false)
+                      }
+                    }}
                   >
                     Delete
                   </button>
@@ -338,9 +487,10 @@ function App() {
 
           <select
             className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm"
-            value={currentRestaurantId}
+            value={currentRestaurantId ?? ''}
             onChange={(event) => switchRestaurantInEditor(event.target.value)}
           >
+            {restaurants.length === 0 ? <option value="">No restaurants</option> : null}
             {restaurants.map((restaurant) => (
               <option key={restaurant.id} value={restaurant.id}>
                 {restaurant.name}
@@ -350,9 +500,10 @@ function App() {
 
           <select
             className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm"
-            value={currentFloorId}
+            value={currentFloorId ?? ''}
             onChange={(event) => switchFloorInEditor(event.target.value)}
           >
+            {floors.length === 0 ? <option value="">No floors</option> : null}
             {floors.map((floor) => (
               <option key={floor.id} value={floor.id}>
                 {floor.name}
@@ -361,6 +512,14 @@ function App() {
           </select>
 
           <div className="ml-auto flex gap-2">
+            <button
+              type="button"
+              className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isBackendLoading}
+              onClick={onSaveCurrentFloorLayout}
+            >
+              {isBackendLoading ? 'Saving...' : 'Save Floor Layout'}
+            </button>
             <button
               type="button"
               className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
@@ -385,6 +544,12 @@ function App() {
             </button>
           </div>
         </div>
+
+        {backendFeedback ? (
+          <div className="mb-3 rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-xs text-slate-600">
+            {backendFeedback}
+          </div>
+        ) : null}
 
         <div
           className="grid h-[calc(100%-52px)] [grid-template-columns:var(--editor-cols)] overflow-hidden rounded-2xl border border-white/60 bg-white/60 shadow-2xl backdrop-blur-md max-lg:grid-cols-1 max-lg:grid-rows-[300px_1fr]"

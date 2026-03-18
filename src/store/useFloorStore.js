@@ -73,6 +73,7 @@ const normalizeOrders = (orders) => {
 
       return {
         id: order?.id ?? createId('order'),
+        tableOrderId: order?.tableOrderId ?? null,
         name,
         quantity,
         unitPrice: Math.max(0, Number(order?.unitPrice ?? 0) || 0),
@@ -255,12 +256,10 @@ const cloneFloor = (floor) => ({
 })
 
 const createRestaurant = (name) => {
-  const defaultFloor = createFloor('Ground Floor')
-
   return {
     id: createId('restaurant'),
     name,
-    floors: [defaultFloor],
+    floors: [],
     goodsCatalog: createDefaultMenuFolders(),
     workers: [],
     openingHours: createDefaultOpeningHours(),
@@ -325,8 +324,6 @@ const loadFloorIntoEditor = (state, floorId) => {
   }
 }
 
-const defaultRestaurant = createRestaurant('Main Restaurant')
-
 const persistCurrentRestaurant = (state) => {
   if (!state.currentRestaurantId) return state.restaurants
 
@@ -338,17 +335,17 @@ const loadRestaurantIntoWorkspace = (state, restaurantId) => {
   const restaurant = state.restaurants.find((item) => item.id === restaurantId)
   if (!restaurant) return state
 
-  const floors = restaurant.floors.length > 0 ? restaurant.floors.map(cloneFloor) : [createFloor('Ground Floor')]
-  const firstFloor = floors[0]
+  const floors = Array.isArray(restaurant.floors) ? restaurant.floors.map(cloneFloor) : []
+  const firstFloor = floors[0] ?? null
 
   return {
     ...state,
     currentRestaurantId: restaurant.id,
     floors,
-    currentFloorId: firstFloor.id,
-    objects: cloneObjects(firstFloor.objects ?? []),
-    canvasZoom: firstFloor.canvasZoom ?? 1,
-    canvasPosition: firstFloor.canvasPosition ?? { x: 160, y: 90 },
+    currentFloorId: firstFloor?.id ?? null,
+    objects: cloneObjects(firstFloor?.objects ?? []),
+    canvasZoom: firstFloor?.canvasZoom ?? 1,
+    canvasPosition: firstFloor?.canvasPosition ?? { x: 160, y: 90 },
     selectedObjectId: null,
   }
 }
@@ -358,10 +355,10 @@ export const useFloorStore = create((set, get) => ({
   editorMode: 'edit',
   waiterTableId: null,
   waiterWorkerId: null,
-  restaurants: [defaultRestaurant],
-  currentRestaurantId: defaultRestaurant.id,
-  floors: [cloneFloor(defaultRestaurant.floors[0])],
-  currentFloorId: defaultRestaurant.floors[0].id,
+  restaurants: [],
+  currentRestaurantId: null,
+  floors: [],
+  currentFloorId: null,
 
   objects: [],
   selectedObjectId: null,
@@ -509,16 +506,28 @@ export const useFloorStore = create((set, get) => ({
     set((state) => {
       const persistedRestaurants = persistCurrentRestaurant(state)
       const remaining = persistedRestaurants.filter((restaurant) => restaurant.id !== restaurantId)
-      const nextRestaurants =
-        remaining.length > 0 ? remaining : [createRestaurant('Main Restaurant')]
+      if (remaining.length === 0) {
+        return {
+          ...state,
+          restaurants: [],
+          currentRestaurantId: null,
+          floors: [],
+          currentFloorId: null,
+          objects: [],
+          selectedObjectId: null,
+          waiterTableId: null,
+          waiterWorkerId: null,
+          page: 'restaurant-management',
+        }
+      }
 
       const nextState = loadRestaurantIntoWorkspace(
         {
           ...state,
-          restaurants: nextRestaurants,
-          currentRestaurantId: nextRestaurants[0].id,
+          restaurants: remaining,
+          currentRestaurantId: remaining[0].id,
         },
-        nextRestaurants[0].id,
+        remaining[0].id,
       )
 
       return {
@@ -627,13 +636,22 @@ export const useFloorStore = create((set, get) => ({
     set((state) => {
       const persistedFloors = persistCurrentFloor(state)
       const remaining = persistedFloors.filter((floor) => floor.id !== floorId)
-      const nextFloors = remaining.length > 0 ? remaining : [createFloor('Ground Floor')]
-      const nextCurrentId = nextFloors[0].id
+      if (remaining.length === 0) {
+        return {
+          ...state,
+          floors: [],
+          currentFloorId: null,
+          objects: [],
+          selectedObjectId: null,
+        }
+      }
+
+      const nextCurrentId = remaining[0].id
 
       const nextState = loadFloorIntoEditor(
         {
           ...state,
-          floors: nextFloors,
+          floors: remaining,
           currentFloorId: nextCurrentId,
         },
         nextCurrentId,
@@ -1428,6 +1446,138 @@ export const useFloorStore = create((set, get) => ({
   setCanvasPosition: (next) => set({ canvasPosition: next }),
 
   clearSelection: () => set({ selectedObjectId: null }),
+
+  hydrateFromBackend: (restaurants, options = {}) => {
+    set((state) => {
+      const safeRestaurants = Array.isArray(restaurants)
+        ? restaurants.filter((restaurant) => restaurant?.id)
+        : []
+
+      if (safeRestaurants.length === 0) {
+        return {
+          restaurants: [],
+          currentRestaurantId: null,
+          floors: [],
+          currentFloorId: null,
+          objects: [],
+          canvasZoom: 1,
+          canvasPosition: { x: 160, y: 90 },
+          selectedObjectId: null,
+          waiterTableId: null,
+          waiterWorkerId: null,
+          page: options.page ?? 'restaurant-management',
+        }
+      }
+
+      const normalizedRestaurants = safeRestaurants.map((restaurant) => {
+        const floors = Array.isArray(restaurant.floors)
+          ? restaurant.floors.map((floor) => ({
+              ...floor,
+              objects: cloneObjects(floor.objects ?? []),
+              canvasZoom: floor.canvasZoom ?? 1,
+              canvasPosition: floor.canvasPosition ?? { x: 160, y: 90 },
+            }))
+          : []
+
+        return {
+          ...restaurant,
+          floors,
+          workers: normalizeWorkers(restaurant.workers),
+          openingHours: normalizeOpeningHours(restaurant.openingHours),
+          goodsCatalog: normalizeMenuFolders(restaurant.goodsCatalog ?? restaurant.goodsCategories),
+          updatedAt: restaurant.updatedAt ?? Date.now(),
+          createdAt: restaurant.createdAt ?? Date.now(),
+        }
+      })
+
+      const preferredRestaurantId = options.currentRestaurantId
+      const preferredFloorId = options.currentFloorId
+      const nextRestaurant =
+        normalizedRestaurants.find((restaurant) => restaurant.id === preferredRestaurantId) ??
+        normalizedRestaurants[0]
+
+      const workspace = loadRestaurantIntoWorkspace(
+        {
+          ...state,
+          restaurants: normalizedRestaurants,
+          currentRestaurantId: nextRestaurant.id,
+        },
+        nextRestaurant.id,
+      )
+
+      const floorExists = workspace.floors.some((floor) => floor.id === preferredFloorId)
+      const withFloor = floorExists
+        ? loadFloorIntoEditor(
+            {
+              ...workspace,
+              floors: workspace.floors,
+            },
+            preferredFloorId,
+          )
+        : workspace
+
+      const waiterTableExists = withFloor.objects.some((object) => object.id === options.waiterTableId)
+      const selectedObjectExists = withFloor.objects.some(
+        (object) => object.id === options.selectedObjectId,
+      )
+
+      return {
+        ...withFloor,
+        page: options.page ?? state.page,
+        editorMode: options.editorMode ?? state.editorMode,
+        waiterTableId: waiterTableExists ? options.waiterTableId : null,
+        waiterWorkerId: options.waiterWorkerId ?? state.waiterWorkerId,
+        selectedObjectId: selectedObjectExists ? options.selectedObjectId : null,
+      }
+    })
+  },
+
+  applyCreatedObjectIds: (idMap) => {
+    if (!(idMap instanceof Map) || idMap.size === 0) return
+
+    set((state) => {
+      const remapObject = (object) => ({
+        ...object,
+        id: idMap.get(object.id) ?? object.id,
+      })
+
+      const remapFloor = (floor) => ({
+        ...floor,
+        objects: (floor.objects ?? []).map(remapObject),
+      })
+
+      const remapRestaurant = (restaurant) => ({
+        ...restaurant,
+        floors: (restaurant.floors ?? []).map(remapFloor),
+      })
+
+      const nextSelectedObjectId = idMap.get(state.selectedObjectId) ?? state.selectedObjectId
+      const nextWaiterTableId = idMap.get(state.waiterTableId) ?? state.waiterTableId
+
+      return {
+        restaurants: state.restaurants.map(remapRestaurant),
+        floors: state.floors.map(remapFloor),
+        objects: state.objects.map(remapObject),
+        selectedObjectId: nextSelectedObjectId,
+        waiterTableId: nextWaiterTableId,
+      }
+    })
+  },
+
+  setTableServiceData: (tableId, payload) => {
+    const table = get().objects.find((object) => object.id === tableId)
+    if (!table || !isTableObjectType(table.type)) return
+
+    const nextReservations = normalizeReservations(payload?.reservations)
+    const nextOrders = normalizeOrders(payload?.orders)
+
+    get().updateObject(tableId, {
+      metadata: {
+        reservations: nextReservations,
+        orders: nextOrders,
+      },
+    })
+  },
 
   exportLayout: () => {
     const state = get()

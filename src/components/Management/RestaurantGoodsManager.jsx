@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useFloorStore } from '../../store/useFloorStore'
+import { backendApi } from '../../services/backendApi'
 
 const findFolderByPath = (folders, pathIds) => {
   let currentFolders = folders
@@ -18,17 +19,15 @@ export const RestaurantGoodsManager = () => {
   const currentRestaurant = useFloorStore((state) =>
     state.restaurants.find((restaurant) => restaurant.id === state.currentRestaurantId) ?? null,
   )
-  const addWorker = useFloorStore((state) => state.addWorker)
-  const updateWorker = useFloorStore((state) => state.updateWorker)
-  const deleteWorker = useFloorStore((state) => state.deleteWorker)
+  const currentRestaurantId = useFloorStore((state) => state.currentRestaurantId)
+  const currentFloorId = useFloorStore((state) => state.currentFloorId)
+  const page = useFloorStore((state) => state.page)
+  const editorMode = useFloorStore((state) => state.editorMode)
+  const waiterTableId = useFloorStore((state) => state.waiterTableId)
+  const waiterWorkerId = useFloorStore((state) => state.waiterWorkerId)
+  const selectedObjectId = useFloorStore((state) => state.selectedObjectId)
+  const hydrateFromBackend = useFloorStore((state) => state.hydrateFromBackend)
   const updateOpeningHoursDay = useFloorStore((state) => state.updateOpeningHoursDay)
-
-  const addMenuFolder = useFloorStore((state) => state.addMenuFolder)
-  const renameMenuFolder = useFloorStore((state) => state.renameMenuFolder)
-  const deleteMenuFolder = useFloorStore((state) => state.deleteMenuFolder)
-  const addMenuItem = useFloorStore((state) => state.addMenuItem)
-  const updateMenuItem = useFloorStore((state) => state.updateMenuItem)
-  const deleteMenuItem = useFloorStore((state) => state.deleteMenuItem)
 
   const [newWorkerName, setNewWorkerName] = useState('')
   const [newWorkerRole, setNewWorkerRole] = useState('waiter')
@@ -36,6 +35,8 @@ export const RestaurantGoodsManager = () => {
   const [newFolderName, setNewFolderName] = useState('')
   const [newItemName, setNewItemName] = useState('')
   const [newItemPrice, setNewItemPrice] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [feedback, setFeedback] = useState('')
 
   const workers = currentRestaurant?.workers ?? []
   const openingHours = currentRestaurant?.openingHours ?? []
@@ -47,6 +48,34 @@ export const RestaurantGoodsManager = () => {
   const visibleFolders = activeFolder ? activeFolder.folders : rootFolders
   const visibleItems = activeFolder ? activeFolder.items : []
 
+  const reloadFromBackend = async (message) => {
+    const graph = await backendApi.fetchRestaurantsGraph()
+    hydrateFromBackend(graph, {
+      currentRestaurantId,
+      currentFloorId,
+      page,
+      editorMode,
+      waiterTableId,
+      waiterWorkerId,
+      selectedObjectId,
+    })
+    if (message) {
+      setFeedback(message)
+    }
+  }
+
+  const runMutation = async (operation, successMessage) => {
+    setIsSaving(true)
+    try {
+      await operation()
+      await reloadFromBackend(successMessage)
+    } catch (error) {
+      setFeedback(error.message)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
     <section className="mt-5 rounded-2xl border border-white/70 bg-white/80 p-4 shadow-xl backdrop-blur">
       <div className="mb-3">
@@ -54,6 +83,7 @@ export const RestaurantGoodsManager = () => {
         <p className="text-xs text-slate-500">
           Manage workers and a nested menu-folder catalog for this restaurant.
         </p>
+        {feedback ? <p className="mt-2 text-xs text-slate-600">{feedback}</p> : null}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -80,9 +110,17 @@ export const RestaurantGoodsManager = () => {
             <button
               type="button"
               className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
+              disabled={isSaving}
               onClick={() => {
                 if (!newWorkerName.trim()) return
-                addWorker(newWorkerName, newWorkerRole)
+                runMutation(
+                  () =>
+                    backendApi.createWorker(currentRestaurantId, {
+                      name: newWorkerName,
+                      role: newWorkerRole,
+                    }),
+                  'Worker created.',
+                )
                 setNewWorkerName('')
               }}
             >
@@ -100,13 +138,29 @@ export const RestaurantGoodsManager = () => {
                   <input
                     className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
                     type="text"
-                    value={worker.name}
-                    onChange={(event) => updateWorker(worker.id, { name: event.target.value })}
+                    defaultValue={worker.name}
+                    onBlur={(event) =>
+                      runMutation(
+                        () =>
+                          backendApi.updateWorker(currentRestaurantId, worker.id, {
+                            name: event.target.value,
+                          }),
+                        'Worker updated.',
+                      )
+                    }
                   />
                   <select
                     className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
-                    value={worker.role}
-                    onChange={(event) => updateWorker(worker.id, { role: event.target.value })}
+                    defaultValue={worker.role}
+                    onChange={(event) =>
+                      runMutation(
+                        () =>
+                          backendApi.updateWorker(currentRestaurantId, worker.id, {
+                            role: event.target.value,
+                          }),
+                        'Worker updated.',
+                      )
+                    }
                   >
                     <option value="waiter">Waiter</option>
                     <option value="manager">Manager</option>
@@ -115,7 +169,13 @@ export const RestaurantGoodsManager = () => {
                   <button
                     type="button"
                     className="rounded-md bg-rose-100 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-200"
-                    onClick={() => deleteWorker(worker.id)}
+                    disabled={isSaving}
+                    onClick={() =>
+                      runMutation(
+                        () => backendApi.deleteWorker(currentRestaurantId, worker.id),
+                        'Worker removed.',
+                      )
+                    }
                   >
                     Remove
                   </button>
@@ -172,6 +232,20 @@ export const RestaurantGoodsManager = () => {
                 </div>
               ))}
             </div>
+
+            <button
+              type="button"
+              className="mt-3 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isSaving}
+              onClick={() =>
+                runMutation(
+                  () => backendApi.upsertWeeklyOpeningHours(currentRestaurantId, openingHours),
+                  'Opening hours saved.',
+                )
+              }
+            >
+              {isSaving ? 'Saving...' : 'Save Opening Hours'}
+            </button>
           </div>
         </article>
 
@@ -204,9 +278,17 @@ export const RestaurantGoodsManager = () => {
             <button
               type="button"
               className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
+              disabled={isSaving}
               onClick={() => {
                 if (!newFolderName.trim()) return
-                addMenuFolder(activeFolder?.id ?? null, newFolderName)
+                runMutation(
+                  () =>
+                    backendApi.createMenuFolder(currentRestaurantId, {
+                      parentFolderId: activeFolder?.id ?? null,
+                      name: newFolderName,
+                    }),
+                  'Menu folder created.',
+                )
                 setNewFolderName('')
               }}
             >
@@ -234,7 +316,13 @@ export const RestaurantGoodsManager = () => {
                   onClick={() => {
                     const next = window.prompt('Rename folder', folder.name)
                     if (!next) return
-                    renameMenuFolder(folder.id, next)
+                    runMutation(
+                      () =>
+                        backendApi.updateMenuFolder(currentRestaurantId, folder.id, {
+                          name: next,
+                        }),
+                      'Menu folder renamed.',
+                    )
                   }}
                 >
                   Rename
@@ -242,7 +330,12 @@ export const RestaurantGoodsManager = () => {
                 <button
                   type="button"
                   className="rounded-md bg-rose-100 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-200"
-                  onClick={() => deleteMenuFolder(folder.id)}
+                  onClick={() =>
+                    runMutation(
+                      () => backendApi.deleteMenuFolder(currentRestaurantId, folder.id),
+                      'Menu folder deleted.',
+                    )
+                  }
                 >
                   Delete
                 </button>
@@ -269,9 +362,15 @@ export const RestaurantGoodsManager = () => {
                     <input
                       className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
                       type="text"
-                      value={item.name}
-                      onChange={(event) =>
-                        updateMenuItem(activeFolder.id, item.id, { name: event.target.value })
+                      defaultValue={item.name}
+                      onBlur={(event) =>
+                        runMutation(
+                          () =>
+                            backendApi.updateMenuItem(currentRestaurantId, activeFolder.id, item.id, {
+                              name: event.target.value,
+                            }),
+                          'Menu item updated.',
+                        )
                       }
                     />
                     <input
@@ -279,15 +378,27 @@ export const RestaurantGoodsManager = () => {
                       type="number"
                       min="0"
                       step="0.01"
-                      value={item.price}
-                      onChange={(event) =>
-                        updateMenuItem(activeFolder.id, item.id, { price: Number(event.target.value) })
+                      defaultValue={item.price}
+                      onBlur={(event) =>
+                        runMutation(
+                          () =>
+                            backendApi.updateMenuItem(currentRestaurantId, activeFolder.id, item.id, {
+                              price: Number(event.target.value),
+                            }),
+                          'Menu item updated.',
+                        )
                       }
                     />
                     <button
                       type="button"
                       className="rounded-md bg-rose-100 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-200"
-                      onClick={() => deleteMenuItem(activeFolder.id, item.id)}
+                      onClick={() =>
+                        runMutation(
+                          () =>
+                            backendApi.deleteMenuItem(currentRestaurantId, activeFolder.id, item.id),
+                          'Menu item removed.',
+                        )
+                      }
                     >
                       Remove
                     </button>
@@ -317,7 +428,15 @@ export const RestaurantGoodsManager = () => {
                   className="rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-500"
                   onClick={() => {
                     if (!newItemName.trim()) return
-                    addMenuItem(activeFolder.id, newItemName, Number(newItemPrice || 0))
+                    runMutation(
+                      () =>
+                        backendApi.createMenuItem(currentRestaurantId, {
+                          folderId: activeFolder.id,
+                          name: newItemName,
+                          price: Number(newItemPrice || 0),
+                        }),
+                      'Menu item added.',
+                    )
                     setNewItemName('')
                     setNewItemPrice('')
                   }}
