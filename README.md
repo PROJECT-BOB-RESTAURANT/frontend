@@ -98,7 +98,9 @@ Defined page values:
 - `guest-reservation`
 
 Key files:
-- `src/App.jsx`: top-level page rendering + drag/drop event coordination.
+- `src/App.jsx`: top-level page switch that composes route-level page components.
+- `src/hooks/useAppController.js`: application orchestration for backend loading, CRUD flows, and editor drag/drop handlers.
+- `src/pages/*.jsx`: route-level page components for restaurant management, floor management, and editor screens.
 - `src/store/useFloorStore.js`: navigation actions and all domain state.
 
 ## 4.2 State and Domain Model
@@ -117,7 +119,7 @@ Top-level entities:
 Important runtime behavior:
 - Active floor edits are persisted back to current restaurant when navigating.
 - Restaurant switching isolates each restaurant dataset.
-- Data currently lives in frontend memory (no API persistence yet).
+- Backend endpoints are the source of truth; Zustand holds synchronized client state for rendering and interactions.
 
 ## 4.3 Layout Editor Flow
 
