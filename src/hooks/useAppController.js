@@ -298,6 +298,7 @@ function useAppController() {
     backToManagement,
     switchFloorInEditor,
     setEditorMode,
+    reloadFromBackend,
     createRestaurant,
     renameRestaurant,
     deleteRestaurant,

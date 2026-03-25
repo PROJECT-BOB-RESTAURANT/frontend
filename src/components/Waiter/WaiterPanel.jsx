@@ -46,7 +46,6 @@ const toDateInputValue = (date) => {
 
 export const WaiterPanel = () => {
   const waiterTableId = useFloorStore((state) => state.waiterTableId)
-  const waiterWorkerId = useFloorStore((state) => state.waiterWorkerId)
   const currentRestaurantId = useFloorStore((state) => state.currentRestaurantId)
   const currentRestaurant = useFloorStore((state) =>
     state.restaurants.find((restaurant) => restaurant.id === state.currentRestaurantId) ?? null,
@@ -80,6 +79,26 @@ export const WaiterPanel = () => {
     return (toDateMs(a.startAt) ?? 0) - (toDateMs(b.startAt) ?? 0)
   })
   const workers = currentRestaurant?.workers ?? []
+  const session = backendApi.getAuthSession()
+  const currentWorker = useMemo(() => {
+    const sessionUserId = String(session?.userId ?? '').trim()
+    const sessionUsername = String(session?.username ?? '').trim().toLowerCase()
+
+    if (sessionUserId) {
+      const byUserId = workers.find((worker) => String(worker.userId ?? '') === sessionUserId)
+      if (byUserId) return byUserId
+    }
+
+    if (sessionUsername) {
+      return (
+        workers.find((worker) => String(worker.name ?? '').trim().toLowerCase() === sessionUsername) ?? null
+      )
+    }
+
+    return null
+  }, [workers, session?.userId, session?.username])
+  const currentWorkerId = currentWorker?.id ?? null
+  const currentWorkerName = currentWorker?.name ?? session?.username ?? null
   const rootFolders = currentRestaurant?.goodsCatalog ?? currentRestaurant?.goodsCategories ?? []
   const activeFolder = useMemo(() => findFolderByPath(rootFolders, menuPath), [rootFolders, menuPath])
   const visibleFolders = activeFolder ? activeFolder.folders : rootFolders
@@ -168,6 +187,10 @@ export const WaiterPanel = () => {
     })
   }, [currentRestaurantId, waiterTableId])
 
+  useEffect(() => {
+    setWaiterWorker(currentWorkerId)
+  }, [setWaiterWorker, currentWorkerId])
+
   const runMutation = async (operation, successMessage) => {
     setIsSaving(true)
     try {
@@ -209,7 +232,7 @@ export const WaiterPanel = () => {
       const orderId = await backendApi.ensureOpenOrderId(
         currentRestaurantId,
         waiterTableId,
-        waiterWorkerId,
+        currentWorkerId,
       )
 
       await backendApi.addOrderLine(currentRestaurantId, waiterTableId, orderId, line)
@@ -231,14 +254,8 @@ export const WaiterPanel = () => {
             unitPrice: updates.unitPrice ?? order.unitPrice,
             note: updates.note ?? order.note,
             status: updates.status ?? order.status,
-            placedByWorkerId:
-              updates.placedByWorkerId !== undefined
-                ? updates.placedByWorkerId
-                : order.placedByWorkerId,
-            placedByWorkerName:
-              updates.placedByWorkerName !== undefined
-                ? updates.placedByWorkerName
-                : order.placedByWorkerName,
+            placedByWorkerId: order.placedByWorkerId,
+            placedByWorkerName: order.placedByWorkerName,
           },
         ),
       'Order line updated.',
@@ -579,21 +596,13 @@ export const WaiterPanel = () => {
           </button>
         </div>
         <div className="mb-4 max-w-sm rounded-xl border border-slate-200 bg-white p-3">
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Worker Placing Orders
-          </label>
-          <select
-            className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm"
-            value={waiterWorkerId ?? ''}
-            onChange={(event) => setWaiterWorker(event.target.value || null)}
-          >
-            <option value="">Unassigned</option>
-            {workers.map((worker) => (
-              <option key={worker.id} value={worker.id}>
-                {worker.name} ({worker.role})
-              </option>
-            ))}
-          </select>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Order Placed By</p>
+          <p className="mt-1 text-sm font-semibold text-slate-800">{currentWorkerName ?? 'Current user'}</p>
+          {!currentWorkerId ? (
+            <p className="mt-1 text-[11px] text-amber-700">
+              You are not assigned as a worker in this restaurant yet. Orders will use your username.
+            </p>
+          ) : null}
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
@@ -649,9 +658,8 @@ export const WaiterPanel = () => {
                           unitPrice: item.price,
                           note: '',
                           status: 'pending',
-                          placedByWorkerId: waiterWorkerId,
-                          placedByWorkerName:
-                            workers.find((worker) => worker.id === waiterWorkerId)?.name ?? null,
+                          placedByWorkerId: currentWorkerId,
+                          placedByWorkerName: currentWorkerName,
                         })
                       }
                     >
@@ -697,9 +705,8 @@ export const WaiterPanel = () => {
                     unitPrice: Math.max(0, Number(customPrice) || 0),
                     note: customNote,
                     status: 'pending',
-                    placedByWorkerId: waiterWorkerId,
-                    placedByWorkerName:
-                      workers.find((worker) => worker.id === waiterWorkerId)?.name ?? null,
+                    placedByWorkerId: currentWorkerId,
+                    placedByWorkerName: currentWorkerName,
                   })
                   setCustomItemName('')
                   setCustomNote('')
@@ -741,30 +748,6 @@ export const WaiterPanel = () => {
                       >
                         <option value="pending">Pending</option>
                         <option value="served">Served</option>
-                      </select>
-                    </div>
-
-                    <div className="mt-2 max-w-[240px]">
-                      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                        Placed By
-                      </label>
-                      <select
-                        className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
-                        value={order.placedByWorkerId ?? ''}
-                        onChange={(event) =>
-                          updateOrderLine(order, {
-                            placedByWorkerId: event.target.value || null,
-                            placedByWorkerName:
-                              workers.find((worker) => worker.id === event.target.value)?.name ?? null,
-                          })
-                        }
-                      >
-                        <option value="">Unassigned</option>
-                        {workers.map((worker) => (
-                          <option key={worker.id} value={worker.id}>
-                            {worker.name} ({worker.role})
-                          </option>
-                        ))}
                       </select>
                     </div>
 

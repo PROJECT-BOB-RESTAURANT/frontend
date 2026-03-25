@@ -7,6 +7,10 @@ The current build is frontend-first (Zustand in-memory state), structured so bac
 ## 1. Product Snapshot
 
 Current capabilities:
+- Default login page with account sign-in.
+- Admin-only pre-page with entry options for user management and restaurant management.
+- Fixed user status widget (bottom-left) showing current username and role, with hide and logout actions.
+- Dedicated workers management page where restaurant workers are assigned from searchable system users.
 - Multi-restaurant management with isolated data contexts.
 - Per-restaurant floor management and canvas editing.
 - Table metadata with seat counts and labels.
@@ -40,6 +44,11 @@ cd ../backend
 cd ../frontend
 npm run dev
 ```
+
+When the app opens, the first screen is the login page.
+
+- `POST /api/v1/auth/login` is used for sign-in.
+- Successful sign-in stores JWT session data in browser storage and uses `Authorization: Bearer <token>` on protected API calls.
 
 Build and preview production output:
 
@@ -90,12 +99,18 @@ Use guest reservation page to create bookings:
 
 The app uses store-driven page state (not React Router).
 
+Authentication is handled before store-driven navigation: unauthenticated users see the login page first.
+
 Defined page values:
 - `restaurant-management`
 - `management`
 - `editor`
 - `waiter-management`
 - `guest-reservation`
+
+Additional app-level admin views:
+- `admin-home`
+- `admin-users`
 
 Key files:
 - `src/App.jsx`: top-level page switch that composes route-level page components.
@@ -155,6 +170,21 @@ Current implemented rules:
 
 ## 5. Options Available in the UI
 
+## 5.0 Authentication Options
+
+From login page:
+- Sign in with username and password
+- Continue to management pages after successful authentication
+
+From authenticated pages:
+- See active username and role in the bottom-left user status widget
+- Logout and return to login page
+- For admins in restaurant flow: return to admin pre-page using the `Admin` button in the user status widget
+
+Admin-only pre-page:
+- `Manage Users`: open admin user creation screen
+- `Manage Restaurants`: continue to restaurant list and operations
+
 ### Backend Integration Notes
 
 - Restaurant and floor create/rename/delete operations are connected to backend endpoints.
@@ -174,11 +204,18 @@ From restaurants view:
 - Open guest reservation page
 
 From restaurant management panel:
-- Manage workers (add/update/remove)
+- Open dedicated workers page
 - Manage opening hours per day
 - Mark day as closed
 - Manage nested menu folders
 - Manage menu items with pricing
+
+From workers page:
+- Search users by username
+- Assign selected user as worker for the current restaurant
+- Set worker role at assignment time
+- Update assigned worker role
+- Remove worker from restaurant
 
 ## 5.2 Floor and Editor Options
 

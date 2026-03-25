@@ -29,8 +29,6 @@ export const RestaurantGoodsManager = () => {
   const hydrateFromBackend = useFloorStore((state) => state.hydrateFromBackend)
   const updateOpeningHoursDay = useFloorStore((state) => state.updateOpeningHoursDay)
 
-  const [newWorkerName, setNewWorkerName] = useState('')
-  const [newWorkerRole, setNewWorkerRole] = useState('waiter')
   const [folderPath, setFolderPath] = useState([])
   const [newFolderName, setNewFolderName] = useState('')
   const [newItemName, setNewItemName] = useState('')
@@ -38,7 +36,6 @@ export const RestaurantGoodsManager = () => {
   const [isSaving, setIsSaving] = useState(false)
   const [feedback, setFeedback] = useState('')
 
-  const workers = currentRestaurant?.workers ?? []
   const openingHours = currentRestaurant?.openingHours ?? []
   const rootFolders = currentRestaurant?.goodsCatalog ?? currentRestaurant?.goodsCategories ?? []
   const activeFolder = useMemo(
@@ -81,172 +78,72 @@ export const RestaurantGoodsManager = () => {
       <div className="mb-3">
         <h2 className="text-base font-bold text-slate-800">Restaurant Management</h2>
         <p className="text-xs text-slate-500">
-          Manage workers and a nested menu-folder catalog for this restaurant.
+          Manage opening hours and a nested menu-folder catalog for this restaurant.
         </p>
         {feedback ? <p className="mt-2 text-xs text-slate-600">{feedback}</p> : null}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <article className="rounded-xl border border-slate-200 bg-white p-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Workers</h3>
-
-          <div className="mt-3 flex gap-2">
-            <input
-              className="flex-1 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
-              type="text"
-              placeholder="Worker name"
-              value={newWorkerName}
-              onChange={(event) => setNewWorkerName(event.target.value)}
-            />
-            <select
-              className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
-              value={newWorkerRole}
-              onChange={(event) => setNewWorkerRole(event.target.value)}
-            >
-              <option value="waiter">Waiter</option>
-              <option value="manager">Manager</option>
-              <option value="chef">Chef</option>
-            </select>
-            <button
-              type="button"
-              className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
-              disabled={isSaving}
-              onClick={() => {
-                if (!newWorkerName.trim()) return
-                runMutation(
-                  () =>
-                    backendApi.createWorker(currentRestaurantId, {
-                      name: newWorkerName,
-                      role: newWorkerRole,
-                    }),
-                  'Worker created.',
-                )
-                setNewWorkerName('')
-              }}
-            >
-              Add
-            </button>
-          </div>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+            Opening Hours
+          </h3>
+          <p className="mt-1 text-xs text-slate-500">
+            Set opening/closing times per day or mark day as closed.
+          </p>
 
           <div className="mt-3 space-y-2">
-            {workers.length > 0 ? (
-              workers.map((worker) => (
-                <div
-                  key={worker.id}
-                  className="grid grid-cols-[1fr_140px_auto] items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-2"
-                >
+            {openingHours.map((entry) => (
+              <div
+                key={entry.day}
+                className="grid grid-cols-[110px_1fr_1fr_auto] items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-2"
+              >
+                <span className="text-xs font-semibold text-slate-700">{entry.day}</span>
+                <input
+                  className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                  type="time"
+                  value={entry.open}
+                  disabled={entry.isClosed}
+                  onChange={(event) =>
+                    updateOpeningHoursDay(entry.day, { open: event.target.value })
+                  }
+                />
+                <input
+                  className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                  type="time"
+                  value={entry.close}
+                  disabled={entry.isClosed}
+                  onChange={(event) =>
+                    updateOpeningHoursDay(entry.day, { close: event.target.value })
+                  }
+                />
+                <label className="flex items-center gap-1 text-[11px] font-semibold text-slate-600">
                   <input
-                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
-                    type="text"
-                    defaultValue={worker.name}
-                    onBlur={(event) =>
-                      runMutation(
-                        () =>
-                          backendApi.updateWorker(currentRestaurantId, worker.id, {
-                            name: event.target.value,
-                          }),
-                        'Worker updated.',
-                      )
+                    type="checkbox"
+                    checked={entry.isClosed}
+                    onChange={(event) =>
+                      updateOpeningHoursDay(entry.day, { isClosed: event.target.checked })
                     }
                   />
-                  <select
-                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
-                    defaultValue={worker.role}
-                    onChange={(event) =>
-                      runMutation(
-                        () =>
-                          backendApi.updateWorker(currentRestaurantId, worker.id, {
-                            role: event.target.value,
-                          }),
-                        'Worker updated.',
-                      )
-                    }
-                  >
-                    <option value="waiter">Waiter</option>
-                    <option value="manager">Manager</option>
-                    <option value="chef">Chef</option>
-                  </select>
-                  <button
-                    type="button"
-                    className="rounded-md bg-rose-100 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-200"
-                    disabled={isSaving}
-                    onClick={() =>
-                      runMutation(
-                        () => backendApi.deleteWorker(currentRestaurantId, worker.id),
-                        'Worker removed.',
-                      )
-                    }
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))
-            ) : (
-              <p className="text-xs text-slate-500">No workers yet.</p>
-            )}
+                  Closed
+                </label>
+              </div>
+            ))}
           </div>
 
-          <div className="mt-5 border-t border-slate-200 pt-4">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-              Opening Hours
-            </h3>
-            <p className="mt-1 text-xs text-slate-500">
-              Set opening/closing times per day or mark day as closed.
-            </p>
-
-            <div className="mt-3 space-y-2">
-              {openingHours.map((entry) => (
-                <div
-                  key={entry.day}
-                  className="grid grid-cols-[110px_1fr_1fr_auto] items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-2"
-                >
-                  <span className="text-xs font-semibold text-slate-700">{entry.day}</span>
-                  <input
-                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
-                    type="time"
-                    value={entry.open}
-                    disabled={entry.isClosed}
-                    onChange={(event) =>
-                      updateOpeningHoursDay(entry.day, { open: event.target.value })
-                    }
-                  />
-                  <input
-                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
-                    type="time"
-                    value={entry.close}
-                    disabled={entry.isClosed}
-                    onChange={(event) =>
-                      updateOpeningHoursDay(entry.day, { close: event.target.value })
-                    }
-                  />
-                  <label className="flex items-center gap-1 text-[11px] font-semibold text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={entry.isClosed}
-                      onChange={(event) =>
-                        updateOpeningHoursDay(entry.day, { isClosed: event.target.checked })
-                      }
-                    />
-                    Closed
-                  </label>
-                </div>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              className="mt-3 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={isSaving}
-              onClick={() =>
-                runMutation(
-                  () => backendApi.upsertWeeklyOpeningHours(currentRestaurantId, openingHours),
-                  'Opening hours saved.',
-                )
-              }
-            >
-              {isSaving ? 'Saving...' : 'Save Opening Hours'}
-            </button>
-          </div>
+          <button
+            type="button"
+            className="mt-3 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isSaving}
+            onClick={() =>
+              runMutation(
+                () => backendApi.upsertWeeklyOpeningHours(currentRestaurantId, openingHours),
+                'Opening hours saved.',
+              )
+            }
+          >
+            {isSaving ? 'Saving...' : 'Save Opening Hours'}
+          </button>
         </article>
 
         <article className="rounded-xl border border-slate-200 bg-white p-4">

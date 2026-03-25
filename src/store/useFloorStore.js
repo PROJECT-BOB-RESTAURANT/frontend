@@ -167,7 +167,7 @@ const normalizeWorkers = (workers) => {
       return {
         id: worker?.id ?? createId('worker'),
         name,
-        role: String(worker?.role ?? 'waiter').trim() || 'waiter',
+        role: String(worker?.role ?? 'staff').trim() || 'staff',
       }
     })
     .filter(Boolean)
@@ -1066,9 +1066,9 @@ export const useFloorStore = create((set, get) => ({
     })
   },
 
-  addWorker: (name, role = 'waiter') => {
+  addWorker: (name, role = 'staff') => {
     const nextName = String(name ?? '').trim()
-    const nextRole = String(role ?? '').trim() || 'waiter'
+    const nextRole = String(role ?? '').trim() || 'staff'
     if (!nextName) return
 
     set((state) => ({

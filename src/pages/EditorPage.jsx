@@ -4,6 +4,7 @@ import { InspectorPanel } from '../components/Inspector/InspectorPanel'
 import { ObjectLibrary } from '../components/Sidebar/ObjectLibrary'
 
 function EditorPage({
+  role,
   onDragEnd,
   editorMode,
   isBackendLoading,
@@ -19,6 +20,8 @@ function EditorPage({
   onSaveCurrentFloorLayout,
   onSetEditorMode,
 }) {
+  const isStaff = role === 'STAFF'
+
   return (
     <DndContext onDragEnd={onDragEnd}>
       <main className="h-screen overflow-hidden bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-4">
@@ -65,38 +68,40 @@ function EditorPage({
             ))}
           </select>
 
-          <div className="ml-auto flex gap-2">
-            <button
-              type="button"
-              className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={isBackendLoading}
-              onClick={onSaveCurrentFloorLayout}
-            >
-              {isBackendLoading ? 'Saving...' : 'Save Floor Layout'}
-            </button>
-            <button
-              type="button"
-              className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                editorMode === 'view'
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-              onClick={() => onSetEditorMode('view')}
-            >
-              View Mode
-            </button>
-            <button
-              type="button"
-              className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                editorMode === 'edit'
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-              onClick={() => onSetEditorMode('edit')}
-            >
-              Edit Mode
-            </button>
-          </div>
+          {!isStaff ? (
+            <div className="ml-auto flex gap-2">
+              <button
+                type="button"
+                className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isBackendLoading}
+                onClick={onSaveCurrentFloorLayout}
+              >
+                {isBackendLoading ? 'Saving...' : 'Save Floor Layout'}
+              </button>
+              <button
+                type="button"
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                  editorMode === 'view'
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+                onClick={() => onSetEditorMode('view')}
+              >
+                View Mode
+              </button>
+              <button
+                type="button"
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                  editorMode === 'edit'
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+                onClick={() => onSetEditorMode('edit')}
+              >
+                Edit Mode
+              </button>
+            </div>
+          ) : null}
         </div>
 
         {backendFeedback ? (
@@ -108,10 +113,10 @@ function EditorPage({
         <div
           className="grid h-[calc(100%-52px)] [grid-template-columns:var(--editor-cols)] overflow-hidden rounded-2xl border border-white/60 bg-white/60 shadow-2xl backdrop-blur-md max-lg:grid-cols-1 max-lg:grid-rows-[300px_1fr]"
           style={{
-            '--editor-cols': editorMode === 'edit' ? '320px 1fr 320px' : '1fr 320px',
+            '--editor-cols': !isStaff && editorMode === 'edit' ? '320px 1fr 320px' : '1fr 320px',
           }}
         >
-          {editorMode === 'edit' ? <ObjectLibrary /> : null}
+          {!isStaff && editorMode === 'edit' ? <ObjectLibrary /> : null}
           <CanvasEditor />
           <InspectorPanel />
         </div>
