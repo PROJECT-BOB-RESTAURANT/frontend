@@ -1,4 +1,5 @@
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '/api/v1').replace(/\/$/, '')
+const AUTH_STORAGE_KEY = 'bob.auth.session'
 
 const WEEK_DAYS = [
   'Monday',
@@ -10,11 +11,17 @@ const WEEK_DAYS = [
   'Sunday',
 ]
 
-const workerRoleToFrontend = (role) => String(role ?? '').toLowerCase() || 'waiter'
+const workerRoleToFrontend = (role) => {
+  const normalized = String(role ?? '').trim().toUpperCase()
+  if (normalized === 'ADMIN' || normalized === 'MANAGER' || normalized === 'STAFF') {
+    return normalized.toLowerCase()
+  }
+  return 'staff'
+}
 const workerRoleToBackend = (role) => {
   const normalized = String(role ?? '').trim().toUpperCase()
-  if (normalized === 'MANAGER' || normalized === 'CHEF' || normalized === 'WAITER') return normalized
-  return 'WAITER'
+  if (normalized === 'ADMIN' || normalized === 'MANAGER' || normalized === 'STAFF') return normalized
+  return 'STAFF'
 }
 
 const orderLineStatusToFrontend = (status) => (status === 'SERVED' ? 'served' : 'pending')
@@ -37,19 +44,98 @@ const extractEnvelopeData = (payload) => {
 const extractErrorMessage = (payload, fallback) => {
   if (!payload) return fallback
   if (typeof payload === 'string') return payload
+  if (typeof payload?.error?.message === 'string' && payload.error.message) return payload.error.message
+  if (typeof payload?.error?.code === 'string' && payload.error.code) return payload.error.code
   if (typeof payload?.message === 'string' && payload.message) return payload.message
   if (typeof payload?.error === 'string' && payload.error) return payload.error
   if (typeof payload?.detail === 'string' && payload.detail) return payload.detail
   return fallback
 }
 
+const parseStoredSession = () => {
+  if (typeof window === 'undefined') return null
+
+  const raw = window.localStorage.getItem(AUTH_STORAGE_KEY)
+  if (!raw) return null
+
+  try {
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    const token = String(parsed.token ?? '').trim()
+    const tokenType = String(parsed.tokenType ?? 'Bearer').trim() || 'Bearer'
+    const userId = parsed.userId ? String(parsed.userId) : null
+    const username = String(parsed.username ?? '').trim()
+    const role = parsed.role ? String(parsed.role) : null
+    const expiresAtRaw = parsed.expiresAt ? String(parsed.expiresAt) : null
+    let expiresAt = null
+    if (expiresAtRaw) {
+      const expiresAtDate = new Date(expiresAtRaw)
+      if (Number.isNaN(expiresAtDate.getTime())) return null
+      expiresAt = expiresAtDate.toISOString()
+    }
+    if (!token || !username) return null
+    if (expiresAt && Date.now() >= new Date(expiresAt).getTime()) return null
+    return { token, tokenType, expiresAt, userId, username, role }
+  } catch {
+    return null
+  }
+}
+
+const authHeaderFromSession = () => {
+  const session = parseStoredSession()
+  if (!session) return null
+  return `${session.tokenType} ${session.token}`
+}
+
+const setAuthSession = ({ token, tokenType = 'Bearer', expiresAt = null, userId = null, username, role }) => {
+  if (typeof window === 'undefined') return null
+  const normalizedToken = String(token ?? '').trim()
+  const normalizedTokenType = String(tokenType ?? 'Bearer').trim() || 'Bearer'
+  let normalizedExpiresAt = null
+  if (expiresAt) {
+    const expiresAtDate = new Date(expiresAt)
+    if (!Number.isNaN(expiresAtDate.getTime())) {
+      normalizedExpiresAt = expiresAtDate.toISOString()
+    }
+  }
+  const normalizedUserId = userId ? String(userId) : null
+  const normalizedUsername = String(username ?? '').trim()
+  const normalizedRole = role ? String(role) : null
+
+  if (!normalizedUsername || !normalizedToken) {
+    window.localStorage.removeItem(AUTH_STORAGE_KEY)
+    return null
+  }
+
+  const next = {
+    token: normalizedToken,
+    tokenType: normalizedTokenType,
+    expiresAt: normalizedExpiresAt,
+    userId: normalizedUserId,
+    username: normalizedUsername,
+    role: normalizedRole,
+  }
+
+  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(next))
+  return next
+}
+
+const clearAuthSession = () => {
+  if (typeof window === 'undefined') return
+  window.localStorage.removeItem(AUTH_STORAGE_KEY)
+}
+
 const request = async (path, options = {}) => {
+  const { skipAuth = false, ...fetchOptions } = options
+  const authHeader = skipAuth ? null : authHeaderFromSession()
+
   const response = await fetch(`${API_BASE}${path}`, {
     headers: {
       'Content-Type': 'application/json',
-      ...(options.headers ?? {}),
+      ...(authHeader ? { Authorization: authHeader } : {}),
+      ...(fetchOptions.headers ?? {}),
     },
-    ...options,
+    ...fetchOptions,
   })
 
   if (response.status === 204) return null
@@ -251,6 +337,7 @@ const mapRestaurant = (restaurant, floors, workers, openingHours, menuFolders, m
   goodsCatalog: buildGoodsCatalog(menuFolders, menuItems),
   workers: (workers ?? []).map((worker) => ({
     id: worker.id,
+    userId: worker.userId,
     name: worker.name,
     role: workerRoleToFrontend(worker.role),
   })),
@@ -284,6 +371,32 @@ const floorObjectToPayload = (object, floorId) => ({
 
 const isUuid = (value) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value ?? ''))
+
+const login = (credentials) =>
+  request('/auth/login', {
+    method: 'POST',
+    skipAuth: true,
+    body: JSON.stringify({
+      username: credentials.username,
+      password: credentials.password,
+    }),
+  })
+
+const register = (payload) =>
+  request('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({
+      username: payload.username,
+      password: payload.password,
+      role: payload.role,
+    }),
+  })
+
+const listUsers = (query = '') => {
+  const normalized = String(query ?? '').trim()
+  const params = normalized ? `?query=${encodeURIComponent(normalized)}` : ''
+  return request(`/auth/users${params}`)
+}
 
 const listRestaurants = () => request('/restaurants')
 const createRestaurant = (name) => request('/restaurants', { method: 'POST', body: JSON.stringify({ name }) })
@@ -325,7 +438,7 @@ const createWorker = (restaurantId, worker) =>
   request(`/restaurants/${restaurantId}/workers`, {
     method: 'POST',
     body: JSON.stringify({
-      restaurantId,
+      userId: worker.userId,
       name: worker.name,
       role: workerRoleToBackend(worker.role),
     }),
@@ -599,6 +712,12 @@ const ensureOpenOrderId = async (restaurantId, tableObjectId, workerId) => {
 }
 
 export const backendApi = {
+  login,
+  register,
+  listUsers,
+  setAuthSession,
+  clearAuthSession,
+  getAuthSession: parseStoredSession,
   fetchRestaurantsGraph,
   saveFloorLayout,
   fetchTableServiceState,

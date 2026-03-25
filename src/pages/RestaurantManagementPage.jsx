@@ -1,6 +1,7 @@
 import { countFolders, formatTodayOpeningHours } from '../utils/restaurantStats'
 
 function RestaurantManagementPage({
+  role,
   restaurants,
   isBackendLoading,
   onOpenGuestReservationPage,
@@ -9,6 +10,8 @@ function RestaurantManagementPage({
   onRenameRestaurant,
   onDeleteRestaurant,
 }) {
+  const isStaff = role === 'STAFF'
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-6">
       <section className="mx-auto max-w-5xl rounded-2xl border border-white/70 bg-white/75 p-6 shadow-2xl backdrop-blur">
@@ -17,23 +20,25 @@ function RestaurantManagementPage({
             <h1 className="text-2xl font-extrabold text-slate-800">Restaurants</h1>
             <p className="text-sm text-slate-500">Create, view, and manage restaurant locations.</p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
-              onClick={onOpenGuestReservationPage}
-            >
-              Guest Reservation Page
-            </button>
-            <button
-              type="button"
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-              onClick={onCreateRestaurant}
-              disabled={isBackendLoading}
-            >
-              Add New Restaurant
-            </button>
-          </div>
+          {!isStaff ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
+                onClick={onOpenGuestReservationPage}
+              >
+                Guest Reservation Page
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={onCreateRestaurant}
+                disabled={isBackendLoading}
+              >
+                Add New Restaurant
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
@@ -55,7 +60,7 @@ function RestaurantManagementPage({
                 Updated: {new Date(restaurant.updatedAt).toLocaleString()}
               </p>
 
-              <div className="mt-3 grid grid-cols-3 gap-2">
+              <div className={`mt-3 grid gap-2 ${isStaff ? 'grid-cols-1' : 'grid-cols-3'}`}>
                 <button
                   type="button"
                   className="rounded-md bg-sky-600 px-2 py-1 text-xs font-semibold text-white hover:bg-sky-500"
@@ -63,22 +68,26 @@ function RestaurantManagementPage({
                 >
                   Open Floors
                 </button>
-                <button
-                  type="button"
-                  className="rounded-md bg-amber-500 px-2 py-1 text-xs font-semibold text-white hover:bg-amber-400"
-                  onClick={() => onRenameRestaurant(restaurant)}
-                  disabled={isBackendLoading}
-                >
-                  Rename
-                </button>
-                <button
-                  type="button"
-                  className="rounded-md bg-rose-600 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-500"
-                  onClick={() => onDeleteRestaurant(restaurant.id)}
-                  disabled={isBackendLoading}
-                >
-                  Delete
-                </button>
+                {!isStaff ? (
+                  <button
+                    type="button"
+                    className="rounded-md bg-amber-500 px-2 py-1 text-xs font-semibold text-white hover:bg-amber-400"
+                    onClick={() => onRenameRestaurant(restaurant)}
+                    disabled={isBackendLoading}
+                  >
+                    Rename
+                  </button>
+                ) : null}
+                {!isStaff ? (
+                  <button
+                    type="button"
+                    className="rounded-md bg-rose-600 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-500"
+                    onClick={() => onDeleteRestaurant(restaurant.id)}
+                    disabled={isBackendLoading}
+                  >
+                    Delete
+                  </button>
+                ) : null}
               </div>
             </article>
           ))}

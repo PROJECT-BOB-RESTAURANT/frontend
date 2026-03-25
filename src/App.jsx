@@ -1,20 +1,36 @@
+import { useEffect, useState } from 'react'
+import { UserStatusBadge } from './components/Auth/UserStatusBadge'
 import { GuestReservationPage } from './components/Guest/GuestReservationPage'
 import { RestaurantGoodsManager } from './components/Management/RestaurantGoodsManager'
 import { WaiterPanel } from './components/Waiter/WaiterPanel'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useAppController } from './hooks/useAppController'
+import { AdminHomePage } from './pages/AdminHomePage'
+import { AdminUsersPage } from './pages/AdminUsersPage'
 import { EditorPage } from './pages/EditorPage'
 import { FloorManagementPage } from './pages/FloorManagementPage'
+import { LoginPage } from './pages/LoginPage'
 import { RestaurantManagementPage } from './pages/RestaurantManagementPage'
+import { WorkersManagementPage } from './pages/WorkersManagementPage'
+import { backendApi } from './services/backendApi'
 
-function App() {
+function AppContent({ role }) {
   const controller = useAppController()
+  const [managementView, setManagementView] = useState('floors')
+  const isStaff = role === 'STAFF'
 
   useKeyboardShortcuts()
+
+  useEffect(() => {
+    if (controller.page !== 'management') {
+      setManagementView('floors')
+    }
+  }, [controller.page])
 
   if (controller.page === 'restaurant-management') {
     return (
       <RestaurantManagementPage
+        role={role}
         restaurants={controller.restaurants}
         isBackendLoading={controller.isBackendLoading}
         onOpenGuestReservationPage={controller.openGuestReservationPage}
@@ -27,8 +43,22 @@ function App() {
   }
 
   if (controller.page === 'management') {
+    if (!isStaff && managementView === 'workers') {
+      return (
+        <WorkersManagementPage
+          currentRestaurant={controller.currentRestaurant}
+          currentRestaurantId={controller.currentRestaurantId}
+          restaurants={controller.restaurants}
+          onSwitchRestaurant={controller.switchRestaurantInManagement}
+          onBack={() => setManagementView('floors')}
+          onReload={controller.reloadFromBackend}
+        />
+      )
+    }
+
     return (
       <FloorManagementPage
+        role={role}
         currentRestaurant={controller.currentRestaurant}
         currentRestaurantId={controller.currentRestaurantId}
         restaurants={controller.restaurants}
@@ -40,7 +70,8 @@ function App() {
         onOpenFloor={controller.openFloor}
         onRenameFloor={controller.renameFloor}
         onDeleteFloor={controller.deleteFloor}
-        goodsManager={<RestaurantGoodsManager />}
+        onOpenWorkers={() => setManagementView('workers')}
+        goodsManager={!isStaff ? <RestaurantGoodsManager /> : null}
       />
     )
   }
@@ -55,6 +86,7 @@ function App() {
 
   return (
     <EditorPage
+      role={role}
       onDragEnd={controller.onDragEnd}
       editorMode={controller.editorMode}
       isBackendLoading={controller.isBackendLoading}
@@ -70,6 +102,60 @@ function App() {
       onSaveCurrentFloorLayout={controller.onSaveCurrentFloorLayout}
       onSetEditorMode={controller.setEditorMode}
     />
+  )
+}
+
+function App() {
+  const [session, setSession] = useState(() => backendApi.getAuthSession())
+  const [adminView, setAdminView] = useState(() =>
+    backendApi.getAuthSession()?.role === 'ADMIN' ? 'home' : 'restaurants',
+  )
+
+  const onAuthenticated = (nextSession) => {
+    setSession(nextSession)
+    setAdminView(nextSession?.role === 'ADMIN' ? 'home' : 'restaurants')
+  }
+
+  const logout = () => {
+    backendApi.clearAuthSession()
+    setSession(null)
+    setAdminView('restaurants')
+  }
+
+  if (!session) {
+    return <LoginPage onAuthenticated={onAuthenticated} />
+  }
+
+  if (session.role === 'ADMIN' && adminView === 'home') {
+    return (
+      <>
+        <UserStatusBadge session={session} onLogout={logout} />
+        <AdminHomePage
+          onManageUsers={() => setAdminView('users')}
+          onManageRestaurants={() => setAdminView('restaurants')}
+        />
+      </>
+    )
+  }
+
+  if (session.role === 'ADMIN' && adminView === 'users') {
+    return (
+      <>
+        <UserStatusBadge session={session} onLogout={logout} />
+        <AdminUsersPage onBack={() => setAdminView('home')} />
+      </>
+    )
+  }
+
+  return (
+    <>
+      <UserStatusBadge
+        session={session}
+        onLogout={logout}
+        onBackToAdmin={session.role === 'ADMIN' ? () => setAdminView('home') : undefined}
+      />
+      <AppContent role={session.role} />
+    </>
   )
 }
 
