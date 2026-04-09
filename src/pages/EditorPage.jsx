@@ -4,6 +4,7 @@ import { PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core
 import { CanvasEditor } from '../components/Canvas/CanvasEditor'
 import { InspectorPanel } from '../components/Inspector/InspectorPanel'
 import { ObjectLibrary } from '../components/Sidebar/ObjectLibrary'
+import { useFloorStore } from '../store/useFloorStore'
 
 const INSPECTOR_WIDTH_MIN = 240
 const INSPECTOR_WIDTH_MAX = 620
@@ -11,6 +12,15 @@ const INSPECTOR_WIDTH_DEFAULT = 320
 const INSPECTOR_HEIGHT_MIN = 150
 const INSPECTOR_HEIGHT_MAX = 520
 const INSPECTOR_HEIGHT_DEFAULT = 200
+const STATUS_TIME_STEP_MINUTES = 30
+
+const toDateTimeLocalInput = (value) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const pad = (part) => String(part).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
 
 function EditorPage({
   role,
@@ -31,6 +41,9 @@ function EditorPage({
 }) {
   const isStaff = role === 'STAFF'
   const isAdmin = role === 'ADMIN'
+  const reservationPreviewAt = useFloorStore((state) => state.reservationPreviewAt)
+  const setReservationPreviewAt = useFloorStore((state) => state.setReservationPreviewAt)
+  const [statusTimeInput, setStatusTimeInput] = useState(() => toDateTimeLocalInput(reservationPreviewAt))
   const [inspectorWidth, setInspectorWidth] = useState(() => {
     const stored = Number(localStorage.getItem('editor-inspector-width'))
     if (Number.isNaN(stored) || stored <= 0) {
@@ -67,6 +80,10 @@ function EditorPage({
   useEffect(() => {
     localStorage.setItem('editor-inspector-height', String(inspectorHeight))
   }, [inspectorHeight])
+
+  useEffect(() => {
+    setStatusTimeInput(toDateTimeLocalInput(reservationPreviewAt))
+  }, [reservationPreviewAt])
 
   useEffect(() => {
     const onPointerMove = (event) => {
@@ -117,6 +134,18 @@ function EditorPage({
     }
   }
 
+  const shiftStatusTimeByMinutes = (minutes) => {
+    const baseDate = reservationPreviewAt ? new Date(reservationPreviewAt) : new Date()
+    if (Number.isNaN(baseDate.getTime())) {
+      return
+    }
+
+    const nextDate = new Date(baseDate.getTime() + minutes * 60 * 1000)
+    const nextInputValue = toDateTimeLocalInput(nextDate.toISOString())
+    setStatusTimeInput(nextInputValue)
+    setReservationPreviewAt(nextInputValue)
+  }
+
   return (
     <DndContext onDragEnd={onDragEnd} sensors={sensors}>
       <main className="h-screen overflow-hidden bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-3 sm:p-4">
@@ -162,6 +191,46 @@ function EditorPage({
               </option>
             ))}
           </select>
+
+          <div className="flex min-h-11 items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1">
+            <span className="text-xs font-semibold text-slate-500">Time</span>
+            <input
+              type="datetime-local"
+              className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm"
+              value={statusTimeInput}
+              onChange={(event) => {
+                const nextValue = event.target.value
+                setStatusTimeInput(nextValue)
+                setReservationPreviewAt(nextValue)
+              }}
+            />
+            <button
+              type="button"
+              className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+              onClick={() => shiftStatusTimeByMinutes(STATUS_TIME_STEP_MINUTES)}
+              aria-label="Increase time"
+            >
+              +30 min
+            </button>
+            <button
+              type="button"
+              className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+              onClick={() => shiftStatusTimeByMinutes(-STATUS_TIME_STEP_MINUTES)}
+              aria-label="Decrease time"
+            >
+              -30 min
+            </button>
+            <button
+              type="button"
+              className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+              onClick={() => {
+                setStatusTimeInput('')
+                setReservationPreviewAt(null)
+              }}
+            >
+              Now
+            </button>
+          </div>
 
           {!isStaff ? (
             <div className="ml-auto flex flex-wrap gap-2">

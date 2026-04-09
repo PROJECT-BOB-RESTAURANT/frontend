@@ -374,6 +374,16 @@ const floorObjectToPayload = (object, floorId) => ({
 const isUuid = (value) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value ?? ''))
 
+const INVALID_TABLE_ID_MESSAGE = 'Selected table is not saved yet. Save Floor Layout first.'
+
+const hasPersistedTableId = (tableObjectId) => isUuid(tableObjectId)
+
+const ensurePersistedTableId = (tableObjectId) => {
+  if (!hasPersistedTableId(tableObjectId)) {
+    throw new Error(INVALID_TABLE_ID_MESSAGE)
+  }
+}
+
 const login = (credentials) =>
   request('/auth/login', {
     method: 'POST',
@@ -524,11 +534,17 @@ const deleteMenuItem = (restaurantId, folderId, itemId) =>
   })
 
 const listTableReservations = async (restaurantId, tableObjectId) => {
+  if (!hasPersistedTableId(tableObjectId)) {
+    return []
+  }
+
   const reservations = await request(`/restaurants/${restaurantId}/tables/${tableObjectId}/reservations`)
   return (Array.isArray(reservations) ? reservations : []).map(mapReservationForUi)
 }
-const createReservation = (restaurantId, payload) =>
-  request(`/restaurants/${restaurantId}/reservations`, {
+const createReservation = (restaurantId, payload) => {
+  ensurePersistedTableId(payload?.tableObjectId)
+
+  return request(`/restaurants/${restaurantId}/reservations`, {
     method: 'POST',
     body: JSON.stringify({
       tableObjectId: payload.tableObjectId,
@@ -539,6 +555,7 @@ const createReservation = (restaurantId, payload) =>
       note: payload.note ?? '',
     }),
   })
+}
 const updateReservation = (restaurantId, reservationId, payload) =>
   request(`/restaurants/${restaurantId}/reservations/${reservationId}`, {
     method: 'PATCH',
@@ -553,10 +570,17 @@ const updateReservation = (restaurantId, reservationId, payload) =>
 const deleteReservation = (restaurantId, reservationId) =>
   request(`/restaurants/${restaurantId}/reservations/${reservationId}`, { method: 'DELETE' })
 
-const listOpenOrders = (restaurantId, tableObjectId) =>
-  request(`/restaurants/${restaurantId}/tables/${tableObjectId}/orders/open`)
-const createTableOrder = (restaurantId, tableObjectId, workerId) =>
-  request(`/restaurants/${restaurantId}/tables/${tableObjectId}/orders`, {
+const listOpenOrders = (restaurantId, tableObjectId) => {
+  if (!hasPersistedTableId(tableObjectId)) {
+    return Promise.resolve([])
+  }
+
+  return request(`/restaurants/${restaurantId}/tables/${tableObjectId}/orders/open`)
+}
+const createTableOrder = (restaurantId, tableObjectId, workerId) => {
+  ensurePersistedTableId(tableObjectId)
+
+  return request(`/restaurants/${restaurantId}/tables/${tableObjectId}/orders`, {
     method: 'POST',
     body: JSON.stringify({
       tableObjectId,
@@ -564,14 +588,25 @@ const createTableOrder = (restaurantId, tableObjectId, workerId) =>
       status: 'OPEN',
     }),
   })
-const deleteTableOrder = (restaurantId, tableObjectId, orderId) =>
-  request(`/restaurants/${restaurantId}/tables/${tableObjectId}/orders/${orderId}`, {
+}
+const deleteTableOrder = (restaurantId, tableObjectId, orderId) => {
+  ensurePersistedTableId(tableObjectId)
+
+  return request(`/restaurants/${restaurantId}/tables/${tableObjectId}/orders/${orderId}`, {
     method: 'DELETE',
   })
-const listOrderLines = (restaurantId, tableObjectId, orderId) =>
-  request(`/restaurants/${restaurantId}/tables/${tableObjectId}/orders/${orderId}/lines`)
-const addOrderLine = (restaurantId, tableObjectId, orderId, line) =>
-  request(`/restaurants/${restaurantId}/tables/${tableObjectId}/orders/${orderId}/lines`, {
+}
+const listOrderLines = (restaurantId, tableObjectId, orderId) => {
+  if (!hasPersistedTableId(tableObjectId)) {
+    return Promise.resolve([])
+  }
+
+  return request(`/restaurants/${restaurantId}/tables/${tableObjectId}/orders/${orderId}/lines`)
+}
+const addOrderLine = (restaurantId, tableObjectId, orderId, line) => {
+  ensurePersistedTableId(tableObjectId)
+
+  return request(`/restaurants/${restaurantId}/tables/${tableObjectId}/orders/${orderId}/lines`, {
     method: 'POST',
     body: JSON.stringify({
       tableOrderId: orderId,
@@ -584,8 +619,11 @@ const addOrderLine = (restaurantId, tableObjectId, orderId, line) =>
       status: orderLineStatusToBackend(line.status),
     }),
   })
-const updateOrderLine = (restaurantId, tableObjectId, orderId, lineId, line) =>
-  request(`/restaurants/${restaurantId}/tables/${tableObjectId}/orders/${orderId}/lines/${lineId}`, {
+}
+const updateOrderLine = (restaurantId, tableObjectId, orderId, lineId, line) => {
+  ensurePersistedTableId(tableObjectId)
+
+  return request(`/restaurants/${restaurantId}/tables/${tableObjectId}/orders/${orderId}/lines/${lineId}`, {
     method: 'PATCH',
     body: JSON.stringify({
       itemName: line.name,
@@ -598,10 +636,14 @@ const updateOrderLine = (restaurantId, tableObjectId, orderId, lineId, line) =>
       status: line.status ? orderLineStatusToBackend(line.status) : undefined,
     }),
   })
-const deleteOrderLine = (restaurantId, tableObjectId, orderId, lineId) =>
-  request(`/restaurants/${restaurantId}/tables/${tableObjectId}/orders/${orderId}/lines/${lineId}`, {
+}
+const deleteOrderLine = (restaurantId, tableObjectId, orderId, lineId) => {
+  ensurePersistedTableId(tableObjectId)
+
+  return request(`/restaurants/${restaurantId}/tables/${tableObjectId}/orders/${orderId}/lines/${lineId}`, {
     method: 'DELETE',
   })
+}
 
 const mapReservationForUi = (reservation) => ({
   id: reservation.id,
@@ -725,6 +767,14 @@ const saveFloorLayout = async (restaurantId, floor) => {
 }
 
 const fetchTableServiceState = async (restaurantId, tableObjectId) => {
+  if (!hasPersistedTableId(tableObjectId)) {
+    return {
+      reservations: [],
+      orders: [],
+      openOrderIds: [],
+    }
+  }
+
   const [reservations, openOrders] = await Promise.all([
     listTableReservations(restaurantId, tableObjectId),
     listOpenOrders(restaurantId, tableObjectId),
@@ -749,6 +799,8 @@ const fetchTableServiceState = async (restaurantId, tableObjectId) => {
 }
 
 const ensureOpenOrderId = async (restaurantId, tableObjectId, workerId) => {
+  ensurePersistedTableId(tableObjectId)
+
   const openOrders = await listOpenOrders(restaurantId, tableObjectId)
   if (openOrders.length > 0) return openOrders[0].id
   const created = await createTableOrder(restaurantId, tableObjectId, workerId)

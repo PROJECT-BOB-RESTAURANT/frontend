@@ -202,6 +202,8 @@ Admin-only pre-page:
 - Guest reservations are created through backend reservation endpoints.
 - Waiter orders and reservations are loaded and persisted through backend table/order/reservation endpoints.
 - Floor-object editing remains interactive in-canvas and is persisted with the `Save Floor Layout` button.
+- Table-level backend calls only run for persisted table UUIDs; unsaved local table IDs are blocked in frontend with a save-layout message.
+- Floor planner now refreshes reservation data for all tables on the current floor after backend hydration and restaurant/floor switch, so free/reserved colors stay in sync after user changes.
 - Opening-hours changes are persisted with the `Save Opening Hours` button.
 
 ## 5.1 Restaurant Management Options
@@ -249,6 +251,8 @@ From editor:
 Floor planner UX behavior:
 - Touch-friendly controls with larger tap targets in the top toolbar and side panels
 - Canvas panning supports touch/pen drag for tablet navigation
+- Floor planner toolbar includes a `Time` selector to preview table free/reserved colors at any chosen datetime
+- Floor planner `Time` includes `-` and `+` step buttons (30 minutes) for quick backward/forward availability preview
 - JSON layout tools are visible only for admin users
 - Staff users in planner view only get table service action access (no object data editing panels)
 - Manager and admin can place new library elements in both edit mode and table/view mode
