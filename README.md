@@ -17,6 +17,7 @@ Current capabilities:
 - Waiter table management (orders + reservations + occupancy).
 - Staff kitchen touchscreen workflow (incoming queue, color-coded statuses, timing panel).
 - Reservation statistics page with per-floor/per-table occupancy timelines and direct reservation creation.
+- Floor-wide reservation action that reserves all tables on a selected floor for the same customer and time window.
 - Guest reservation flow (restaurant -> floor -> table -> booking).
 - Restaurant operations setup (workers, opening hours, nested menu catalog).
 
@@ -85,6 +86,12 @@ Use waiter mode for in-service table operations:
 3. Set worker attribution.
 4. Add reservations or manual occupancy.
 5. Monitor timeline and table status.
+
+Use reservation statistics for floor-level booking blocks:
+1. Open reservation statistics.
+2. Select a floor and choose `Reserve Entire Floor`.
+3. Fill customer and time range once.
+4. Save to create reservations across all persisted tables on that floor.
 
 Use kitchen mode for back-of-house ticket flow:
 1. Open kitchen for a restaurant (staff entry).
