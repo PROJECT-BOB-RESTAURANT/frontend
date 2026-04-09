@@ -15,6 +15,8 @@ Current capabilities:
 - Per-restaurant floor management and canvas editing.
 - Table metadata with seat counts and labels.
 - Waiter table management (orders + reservations + occupancy).
+- Staff kitchen touchscreen workflow (incoming queue, color-coded statuses, timing panel).
+- Reservation statistics page with per-floor/per-table occupancy timelines and direct reservation creation.
 - Guest reservation flow (restaurant -> floor -> table -> booking).
 - Restaurant operations setup (workers, opening hours, nested menu catalog).
 
@@ -84,6 +86,12 @@ Use waiter mode for in-service table operations:
 4. Add reservations or manual occupancy.
 5. Monitor timeline and table status.
 
+Use kitchen mode for back-of-house ticket flow:
+1. Open kitchen for a restaurant (staff entry).
+2. Review incoming tickets in created-time order.
+3. Move line statuses through incoming, in progress, prep, ready, and served.
+4. Open ticket timing panel to inspect queue/prep/wait durations.
+
 ## 3.3 Booking Workflow
 
 Use guest reservation page to create bookings:
@@ -106,6 +114,8 @@ Defined page values:
 - `management`
 - `editor`
 - `waiter-management`
+- `kitchen-management`
+- `reservation-statistics`
 - `guest-reservation`
 
 Additional app-level admin views:
@@ -201,6 +211,8 @@ From restaurants view:
 - Rename restaurant
 - Delete restaurant
 - Open management/floors
+- Open reservation statistics
+- Open kitchen (staff)
 - Open guest reservation page
 
 From restaurant management panel:
@@ -232,7 +244,15 @@ From editor:
 - Edit object dimensions and metadata
 - Set table seats
 - Toggle snapping
-- Export and import floor data
+- Export and import floor data (admin only)
+
+Floor planner UX behavior:
+- Touch-friendly controls with larger tap targets in the top toolbar and side panels
+- Canvas panning supports touch/pen drag for tablet navigation
+- JSON layout tools are visible only for admin users
+- Staff users in planner view only get table service action access (no object data editing panels)
+- Manager and admin can place new library elements in both edit mode and table/view mode
+- Planner side panels use larger widths/heights for easier touch navigation
 
 Keyboard shortcuts:
 - `Delete` or `Backspace`: delete selected object
@@ -249,6 +269,7 @@ Order operations:
 - Assign worker
 - Remove order line
 - Clear all table orders
+- Receive ready-to-serve notifications for own placed orders with item and table/floor context
 
 Reservation operations:
 - Add reservation with guest details
@@ -258,6 +279,23 @@ Reservation operations:
 - Extend manual occupancy
 - Clear manual occupancy
 - View day timeline with current-time marker
+
+## 5.4 Kitchen Options
+
+Kitchen operations:
+- View active kitchen queue in incoming order
+- See table, server, note, quantity, and price per line
+- Tap quick status actions with color-coded states
+- Auto-hide served lines from active queue (with optional served toggle)
+- Inspect per-ticket timing stats (queue, in progress, prep, waiting for server, total)
+
+## 5.5 Reservation Statistics Options
+
+Reservation statistics operations:
+- Select restaurant and day
+- Inspect occupancy timeline for each table grouped by floor
+- View closed (non-operating) periods directly on timelines
+- Add reservation directly from any table timeline row
 
 ## 5.4 Guest Reservation Options
 
