@@ -93,6 +93,7 @@ function AppContent({ role }) {
   if (controller.page === 'reservation-statistics') {
     return (
       <ReservationStatisticsPage
+        role={role}
         currentRestaurant={controller.currentRestaurant}
         currentRestaurantId={controller.currentRestaurantId}
         restaurants={controller.restaurants}

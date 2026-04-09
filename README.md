@@ -17,6 +17,8 @@ Current capabilities:
 - Waiter table management (orders + reservations + occupancy).
 - Staff kitchen touchscreen workflow (incoming queue, color-coded statuses, timing panel).
 - Reservation statistics page with per-floor/per-table occupancy timelines and direct reservation creation.
+- Manager analytics cards in reservation statistics for served income, open ticket value, reservation totals, active reservations, and floor-level reservation breakdown.
+- Analytics diagrams in reservation statistics for revenue split and per-floor reservation distribution.
 - Floor-wide reservation action that reserves all tables on a selected floor for the same customer and time window.
 - Guest reservation flow (restaurant -> floor -> table -> booking).
 - Restaurant operations setup (workers, opening hours, nested menu catalog).

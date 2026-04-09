@@ -57,7 +57,14 @@ const fallbackTableLabel = (table) => {
   return `T-${raw.slice(0, 4).toUpperCase()}`
 }
 
+const formatCurrency = (value) => {
+  const numeric = Number(value ?? 0)
+  if (!Number.isFinite(numeric)) return '$0.00'
+  return `$${numeric.toFixed(2)}`
+}
+
 function ReservationStatisticsPage({
+  role,
   currentRestaurant,
   currentRestaurantId,
   restaurants,
@@ -76,6 +83,7 @@ function ReservationStatisticsPage({
   const [reservationStart, setReservationStart] = useState('')
   const [reservationEnd, setReservationEnd] = useState('')
   const [reservationNote, setReservationNote] = useState('')
+  const [kitchenLines, setKitchenLines] = useState([])
 
   const dayStart = useMemo(() => buildDayStart(timelineDate), [timelineDate])
   const dayEnd = useMemo(() => {
@@ -145,6 +153,8 @@ function ReservationStatisticsPage({
       .filter((floor) => floor.tables.length > 0)
   }, [currentRestaurant])
 
+  const canSeeManagerAnalytics = role === 'MANAGER' || role === 'ADMIN'
+
   const loadReservations = async () => {
     if (!currentRestaurantId) return
 
@@ -204,6 +214,118 @@ function ReservationStatisticsPage({
       active = false
     }
   }, [currentRestaurantId])
+
+  useEffect(() => {
+    if (!currentRestaurantId || !canSeeManagerAnalytics) {
+      setKitchenLines([])
+      return
+    }
+
+    let active = true
+
+    backendApi
+      .listKitchenOrderLines(currentRestaurantId, { includeServed: true })
+      .then((lines) => {
+        if (!active) return
+        setKitchenLines(Array.isArray(lines) ? lines : [])
+      })
+      .catch(() => {
+        if (!active) return
+        setKitchenLines([])
+      })
+
+    return () => {
+      active = false
+    }
+  }, [currentRestaurantId, canSeeManagerAnalytics])
+
+  const analytics = useMemo(() => {
+    const allReservations = Object.values(reservationsByTableId).flatMap((entry) =>
+      Array.isArray(entry) ? entry : [],
+    )
+
+    const now = Date.now()
+    const dayStartMs = dayStart.getTime()
+    const dayEndMs = dayEnd.getTime()
+
+    const activeReservations = allReservations.filter((reservation) => {
+      const startMs = toDateMs(reservation.startAt)
+      const endMs = toDateMs(reservation.endAt)
+      return startMs !== null && endMs !== null && startMs <= now && now < endMs
+    })
+
+    const todayReservations = allReservations.filter((reservation) => {
+      const startMs = toDateMs(reservation.startAt)
+      const endMs = toDateMs(reservation.endAt)
+      return startMs !== null && endMs !== null && endMs > dayStartMs && startMs < dayEndMs
+    })
+
+    const servedLines = kitchenLines.filter((line) => line.status === 'served')
+    const openLines = kitchenLines.filter((line) => line.status !== 'served' && line.status !== 'void')
+
+    const servedRevenue = servedLines.reduce(
+      (sum, line) => sum + (Number(line.unitPrice ?? 0) || 0) * Math.max(1, Number(line.quantity ?? 1) || 1),
+      0,
+    )
+    const openRevenue = openLines.reduce(
+      (sum, line) => sum + (Number(line.unitPrice ?? 0) || 0) * Math.max(1, Number(line.quantity ?? 1) || 1),
+      0,
+    )
+
+    const reservationCountByFloor = floorsWithTables.map((floor) => {
+      const count = floor.tables.reduce((sum, table) => {
+        const reservations = reservationsByTableId[table.id]
+        return sum + (Array.isArray(reservations) ? reservations.length : 0)
+      }, 0)
+
+      return {
+        floorId: floor.id,
+        floorName: floor.name,
+        tableCount: floor.tables.length,
+        reservationCount: count,
+      }
+    })
+
+    return {
+      reservationTotal: allReservations.length,
+      activeReservationTotal: activeReservations.length,
+      todayReservationTotal: todayReservations.length,
+      servedRevenue,
+      openRevenue,
+      servedLinesTotal: servedLines.length,
+      openLinesTotal: openLines.length,
+      reservationCountByFloor,
+    }
+  }, [reservationsByTableId, dayStart, dayEnd, kitchenLines, floorsWithTables])
+
+  const revenueDiagram = useMemo(() => {
+    const served = Math.max(0, Number(analytics.servedRevenue) || 0)
+    const open = Math.max(0, Number(analytics.openRevenue) || 0)
+    const total = served + open
+    const servedPct = total > 0 ? (served / total) * 100 : 0
+    const openPct = total > 0 ? (open / total) * 100 : 0
+
+    return {
+      served,
+      open,
+      total,
+      servedPct,
+      openPct,
+      chartStyle: {
+        background: `conic-gradient(#059669 0% ${servedPct}%, #d97706 ${servedPct}% 100%)`,
+      },
+    }
+  }, [analytics.openRevenue, analytics.servedRevenue])
+
+  const floorReservationDiagram = useMemo(() => {
+    const rows = analytics.reservationCountByFloor
+    const maxCount = rows.reduce((max, row) => Math.max(max, row.reservationCount), 0)
+
+    return rows.map((row) => ({
+      ...row,
+      fillPct: maxCount > 0 ? (row.reservationCount / maxCount) * 100 : 0,
+    }))
+  }, [analytics.reservationCountByFloor])
 
   const openFormForTable = (tableId) => {
     const now = new Date()
@@ -335,6 +457,93 @@ function ReservationStatisticsPage({
             {openingHoursLabel}
           </span>
         </div>
+
+        {canSeeManagerAnalytics ? (
+          <section className="mb-4 rounded-xl border border-slate-200 bg-white p-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Manager Analytics</h2>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <article className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Served Income</p>
+                <p className="mt-1 text-xl font-extrabold text-emerald-900">{formatCurrency(analytics.servedRevenue)}</p>
+                <p className="text-[11px] text-emerald-700">Served lines: {analytics.servedLinesTotal}</p>
+              </article>
+
+              <article className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Open Ticket Value</p>
+                <p className="mt-1 text-xl font-extrabold text-amber-900">{formatCurrency(analytics.openRevenue)}</p>
+                <p className="text-[11px] text-amber-700">Open lines: {analytics.openLinesTotal}</p>
+              </article>
+
+              <article className="rounded-lg border border-sky-200 bg-sky-50 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-700">Reservations Total</p>
+                <p className="mt-1 text-xl font-extrabold text-sky-900">{analytics.reservationTotal}</p>
+                <p className="text-[11px] text-sky-700">Current day overlap: {analytics.todayReservationTotal}</p>
+              </article>
+
+              <article className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-rose-700">Active Reservations</p>
+                <p className="mt-1 text-xl font-extrabold text-rose-900">{analytics.activeReservationTotal}</p>
+                <p className="text-[11px] text-rose-700">Right now</p>
+              </article>
+            </div>
+
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {analytics.reservationCountByFloor.map((entry) => (
+                <article key={entry.floorId} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-sm font-semibold text-slate-800">{entry.floorName}</p>
+                  <p className="text-xs text-slate-600">Tables: {entry.tableCount}</p>
+                  <p className="text-xs text-slate-600">Reservations: {entry.reservationCount}</p>
+                </article>
+              ))}
+            </div>
+
+            <div className="mt-3 grid gap-3 lg:grid-cols-2">
+              <article className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Revenue Split Diagram</h3>
+
+                <div className="mt-3 flex items-center gap-4">
+                  <div className="relative h-24 w-24 rounded-full" style={revenueDiagram.chartStyle}>
+                    <div className="absolute inset-4 rounded-full bg-white" />
+                  </div>
+
+                  <div className="space-y-1 text-xs text-slate-700">
+                    <p>
+                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-600" />{' '}
+                      Served: {formatCurrency(revenueDiagram.served)} ({revenueDiagram.servedPct.toFixed(1)}%)
+                    </p>
+                    <p>
+                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-600" />{' '}
+                      Open: {formatCurrency(revenueDiagram.open)} ({revenueDiagram.openPct.toFixed(1)}%)
+                    </p>
+                    <p className="font-semibold text-slate-900">Total: {formatCurrency(revenueDiagram.total)}</p>
+                  </div>
+                </div>
+              </article>
+
+              <article className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Floor Reservation Diagram</h3>
+
+                <div className="mt-3 space-y-2">
+                  {floorReservationDiagram.map((entry) => (
+                    <div key={entry.floorId}>
+                      <div className="mb-1 flex items-center justify-between text-[11px] text-slate-600">
+                        <span>{entry.floorName}</span>
+                        <span>{entry.reservationCount}</span>
+                      </div>
+                      <div className="h-2.5 overflow-hidden rounded-full bg-slate-200">
+                        <div
+                          className="h-full rounded-full bg-sky-600"
+                          style={{ width: `${entry.fillPct}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </div>
+          </section>
+        ) : null}
 
         {feedback ? <p className="mb-3 text-xs text-slate-600">{feedback}</p> : null}
 
