@@ -32,19 +32,21 @@ export const CanvasEditor = () => {
     (event) => {
       if (event.target.closest('[data-floor-object="true"]')) return
 
-      if (event.button !== 0 && event.button !== 1) return
+      if (event.pointerType === 'mouse' && event.button !== 0 && event.button !== 1) return
 
-      // Empty-space left click deselects; dragging then pans immediately.
-      if (event.button === 0) {
+      if (event.pointerType !== 'mouse' || event.button === 0) {
         clearSelection()
       }
 
       panStateRef.current = {
+        pointerId: event.pointerId,
         startX: event.clientX,
         startY: event.clientY,
         originX: canvasPosition.x,
         originY: canvasPosition.y,
       }
+
+      event.currentTarget.setPointerCapture?.(event.pointerId)
       setIsPanning(true)
       event.preventDefault()
     },
@@ -55,6 +57,7 @@ export const CanvasEditor = () => {
     (event) => {
       const pan = panStateRef.current
       if (!pan) return
+      if (pan.pointerId !== undefined && pan.pointerId !== event.pointerId) return
 
       setCanvasPosition({
         x: pan.originX + (event.clientX - pan.startX),
@@ -119,12 +122,13 @@ export const CanvasEditor = () => {
 
       <div
         ref={setDroppableRef}
-        className="relative h-full w-full bg-slate-100"
+        className="relative h-full w-full touch-none bg-slate-100"
         style={gridStyle}
-        onMouseDown={onMouseDownCanvas}
-        onMouseMove={onMouseMove}
-        onMouseUp={onMouseUp}
-        onMouseLeave={onMouseUp}
+        onPointerDown={onMouseDownCanvas}
+        onPointerMove={onMouseMove}
+        onPointerUp={onMouseUp}
+        onPointerCancel={onMouseUp}
+        onPointerLeave={onMouseUp}
       >
         <div
           className="absolute inset-0"

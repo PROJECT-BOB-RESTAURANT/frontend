@@ -9,7 +9,7 @@ const InputRow = ({ label, children }) => (
   </label>
 )
 
-export const InspectorPanel = () => {
+export const InspectorPanel = ({ role }) => {
   const selectedObject = useFloorStore((state) =>
     state.objects.find((item) => item.id === state.selectedObjectId) ?? null,
   )
@@ -20,12 +20,16 @@ export const InspectorPanel = () => {
   const openWaiterForTable = useFloorStore((state) => state.openWaiterForTable)
   const editorMode = useFloorStore((state) => state.editorMode)
   const canEdit = editorMode === 'edit'
+  const isAdmin = role === 'ADMIN'
+  const isStaff = role === 'STAFF'
+  const canAdjustTransform = canEdit || (!isStaff && role !== undefined)
 
   const [jsonText, setJsonText] = useState('')
   const [feedback, setFeedback] = useState('')
 
   const exportPreview = useMemo(() => exportLayout(), [exportLayout])
   const isTable = selectedObject ? isTableObjectType(selectedObject.type) : false
+  const showStaffTableOnlyActions = isStaff && !canEdit
 
   const onLoad = () => {
     try {
@@ -37,18 +41,39 @@ export const InspectorPanel = () => {
   }
 
   return (
-    <aside className="flex h-full flex-col border-l border-slate-200 bg-white/75 backdrop-blur">
+    <aside className="flex h-full min-h-0 flex-col border-l border-slate-200 bg-white/75 backdrop-blur">
       <div className="border-b border-slate-200 px-4 py-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Inspector</h2>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-4">
+      <div className="flex-1 min-h-0 space-y-4 overflow-y-auto p-4">
         {selectedObject ? (
-          <>
+          showStaffTableOnlyActions ? (
+            <>
+              {isTable ? (
+                <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Table Actions</h3>
+                  <p className="text-sm font-semibold text-slate-800">{selectedObject.metadata?.label ?? 'Selected table'}</p>
+                  <button
+                    type="button"
+                    className="min-h-11 w-full rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500"
+                    onClick={() => openWaiterForTable(selectedObject.id)}
+                  >
+                    Manage Table
+                  </button>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                  Staff can only manage table service. Select a table and tap Manage Table.
+                </div>
+              )}
+            </>
+          ) : (
+            <>
             <div className="grid grid-cols-2 gap-2">
               <InputRow label="X">
                 <input
-                  className="rounded-md border border-slate-200 px-2 py-1"
+                  className="min-h-11 rounded-md border border-slate-200 px-3 py-2 text-sm"
                   type="number"
                   value={selectedObject.x}
                   disabled={!canEdit}
@@ -59,7 +84,7 @@ export const InspectorPanel = () => {
               </InputRow>
               <InputRow label="Y">
                 <input
-                  className="rounded-md border border-slate-200 px-2 py-1"
+                  className="min-h-11 rounded-md border border-slate-200 px-3 py-2 text-sm"
                   type="number"
                   value={selectedObject.y}
                   disabled={!canEdit}
@@ -70,7 +95,7 @@ export const InspectorPanel = () => {
               </InputRow>
               <InputRow label="Width">
                 <input
-                  className="rounded-md border border-slate-200 px-2 py-1"
+                  className="min-h-11 rounded-md border border-slate-200 px-3 py-2 text-sm"
                   type="number"
                   value={selectedObject.width}
                   disabled={!canEdit}
@@ -81,7 +106,7 @@ export const InspectorPanel = () => {
               </InputRow>
               <InputRow label="Height">
                 <input
-                  className="rounded-md border border-slate-200 px-2 py-1"
+                  className="min-h-11 rounded-md border border-slate-200 px-3 py-2 text-sm"
                   type="number"
                   value={selectedObject.height}
                   disabled={!canEdit}
@@ -92,52 +117,9 @@ export const InspectorPanel = () => {
               </InputRow>
             </div>
 
-            <InputRow label="Rotation">
-              <input
-                className="rounded-md border border-slate-200 px-2 py-1"
-                type="number"
-                value={selectedObject.rotation}
-                disabled={!canEdit}
-                onChange={(event) =>
-                  updateObject(selectedObject.id, { rotation: Number(event.target.value) })
-                }
-              />
-            </InputRow>
-
-            <div className="grid grid-cols-2 gap-2">
-              <InputRow label="Scale X">
-                <input
-                  className="rounded-md border border-slate-200 px-2 py-1"
-                  type="number"
-                  step="0.1"
-                  min="0.4"
-                  max="5"
-                  value={selectedObject.scaleX ?? 1}
-                  disabled={!canEdit}
-                  onChange={(event) =>
-                    updateObject(selectedObject.id, { scaleX: Number(event.target.value) })
-                  }
-                />
-              </InputRow>
-              <InputRow label="Scale Y">
-                <input
-                  className="rounded-md border border-slate-200 px-2 py-1"
-                  type="number"
-                  step="0.1"
-                  min="0.4"
-                  max="5"
-                  value={selectedObject.scaleY ?? 1}
-                  disabled={!canEdit}
-                  onChange={(event) =>
-                    updateObject(selectedObject.id, { scaleY: Number(event.target.value) })
-                  }
-                />
-              </InputRow>
-            </div>
-
             <InputRow label="Name">
               <input
-                className="rounded-md border border-slate-200 px-2 py-1"
+                className="min-h-11 rounded-md border border-slate-200 px-3 py-2 text-sm"
                 type="text"
                 value={selectedObject.metadata?.label ?? ''}
                 placeholder="Rename object"
@@ -153,7 +135,7 @@ export const InspectorPanel = () => {
             {isTable ? (
               <InputRow label="Max Seats">
                 <input
-                  className="rounded-md border border-slate-200 px-2 py-1"
+                  className="min-h-11 rounded-md border border-slate-200 px-3 py-2 text-sm"
                   type="number"
                   min="1"
                   step="1"
@@ -168,9 +150,55 @@ export const InspectorPanel = () => {
               </InputRow>
             ) : null}
 
+            <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Quick Transform</h3>
+              <InputRow label="Rotation">
+                <input
+                  className="min-h-11 rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  type="number"
+                  value={selectedObject.rotation}
+                  disabled={!canAdjustTransform}
+                  onChange={(event) =>
+                    updateObject(selectedObject.id, { rotation: Number(event.target.value) })
+                  }
+                />
+              </InputRow>
+
+              <div className="grid grid-cols-2 gap-2">
+                <InputRow label="Scale X">
+                  <input
+                    className="min-h-11 rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    type="number"
+                    step="0.1"
+                    min="0.4"
+                    max="5"
+                    value={selectedObject.scaleX ?? 1}
+                    disabled={!canAdjustTransform}
+                    onChange={(event) =>
+                      updateObject(selectedObject.id, { scaleX: Number(event.target.value) })
+                    }
+                  />
+                </InputRow>
+                <InputRow label="Scale Y">
+                  <input
+                    className="min-h-11 rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    type="number"
+                    step="0.1"
+                    min="0.4"
+                    max="5"
+                    value={selectedObject.scaleY ?? 1}
+                    disabled={!canAdjustTransform}
+                    onChange={(event) =>
+                      updateObject(selectedObject.id, { scaleY: Number(event.target.value) })
+                    }
+                  />
+                </InputRow>
+              </div>
+            </div>
+
             <button
               type="button"
-              className="w-full rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+              className="min-h-11 w-full rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700"
               disabled={!canEdit}
               onClick={duplicateSelectedObject}
             >
@@ -180,56 +208,61 @@ export const InspectorPanel = () => {
             {!canEdit && isTable ? (
               <button
                 type="button"
-                className="w-full rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500"
+                className="min-h-11 w-full rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500"
                 onClick={() => openWaiterForTable(selectedObject.id)}
               >
                 Manage Table
               </button>
             ) : null}
-          </>
+            </>
+          )
         ) : (
           <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
-            Select an object to edit its properties.
+            {showStaffTableOnlyActions
+              ? 'Select a table and tap Manage Table.'
+              : 'Select an object to edit its properties.'}
           </div>
         )}
 
-        <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Save / Load Layout
-          </h3>
+        {isAdmin ? (
+          <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Save / Load Layout
+            </h3>
 
-          <textarea
-            className="h-28 w-full rounded-md border border-slate-200 p-2 text-xs"
-            value={jsonText || exportPreview}
-            disabled={!canEdit}
-            onChange={(event) => setJsonText(event.target.value)}
-          />
+            <textarea
+              className="h-28 w-full rounded-md border border-slate-200 p-2 text-xs"
+              value={jsonText || exportPreview}
+              disabled={!canEdit}
+              onChange={(event) => setJsonText(event.target.value)}
+            />
 
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              className="rounded-md bg-sky-600 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-500"
-              disabled={!canEdit}
-              onClick={() => {
-                const next = exportLayout()
-                setJsonText(next)
-                setFeedback('Layout exported into editor.')
-              }}
-            >
-              Export JSON
-            </button>
-            <button
-              type="button"
-              className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500"
-              disabled={!canEdit}
-              onClick={onLoad}
-            >
-              Load JSON
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                className="min-h-11 rounded-md bg-sky-600 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-500"
+                disabled={!canEdit}
+                onClick={() => {
+                  const next = exportLayout()
+                  setJsonText(next)
+                  setFeedback('Layout exported into editor.')
+                }}
+              >
+                Export JSON
+              </button>
+              <button
+                type="button"
+                className="min-h-11 rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500"
+                disabled={!canEdit}
+                onClick={onLoad}
+              >
+                Load JSON
+              </button>
+            </div>
+
+            {feedback ? <p className="text-[11px] text-slate-500">{feedback}</p> : null}
           </div>
-
-          {feedback ? <p className="text-[11px] text-slate-500">{feedback}</p> : null}
-        </div>
+        ) : null}
       </div>
     </aside>
   )

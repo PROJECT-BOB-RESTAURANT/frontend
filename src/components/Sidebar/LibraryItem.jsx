@@ -22,7 +22,7 @@ const LibraryItemComponent = ({ item }) => {
       style={style}
       {...listeners}
       {...attributes}
-      className="w-full rounded-xl border border-slate-200 bg-white/80 p-3 text-left text-sm font-medium text-slate-800 transition hover:border-sky-300 hover:bg-sky-50 active:cursor-grabbing"
+      className="min-h-12 w-full touch-none rounded-xl border border-slate-200 bg-white/80 p-3 text-left text-sm font-medium text-slate-800 transition hover:border-sky-300 hover:bg-sky-50 active:cursor-grabbing"
       data-dragging={isDragging}
     >
       {item.label}
