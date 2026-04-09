@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { snapToGrid, GRID_SIZE, clamp } from '../utils/grid'
 import { getDefaultSeatsForType, isTableObjectType } from '../utils/objectLibrary'
+import { normalizeFrontendOrderLineStatus } from '../utils/orderLineStatus'
 import {
   DEFAULT_RESERVATION_HOURS,
   normalizeReservations,
@@ -74,13 +75,19 @@ const normalizeOrders = (orders) => {
       return {
         id: order?.id ?? createId('order'),
         tableOrderId: order?.tableOrderId ?? null,
+        tableObjectId: order?.tableObjectId ?? null,
         name,
         quantity,
         unitPrice: Math.max(0, Number(order?.unitPrice ?? 0) || 0),
         note: String(order?.note ?? '').trim(),
-        status: order?.status === 'served' ? 'served' : 'pending',
+        status: normalizeFrontendOrderLineStatus(order?.status),
         placedByWorkerId: order?.placedByWorkerId ?? null,
         placedByWorkerName: order?.placedByWorkerName ?? null,
+        statusUpdatedAt: order?.statusUpdatedAt ?? null,
+        inProgressAt: order?.inProgressAt ?? null,
+        inPrepAt: order?.inPrepAt ?? null,
+        readyForServerAt: order?.readyForServerAt ?? null,
+        servedAt: order?.servedAt ?? null,
         createdAt: order?.createdAt ?? Date.now(),
       }
     })
@@ -557,6 +564,46 @@ export const useFloorStore = create((set, get) => ({
     })
   },
 
+  openKitchenForRestaurant: (restaurantId) => {
+    set((state) => {
+      const persistedRestaurants = persistCurrentRestaurant(state)
+      const nextState = loadRestaurantIntoWorkspace(
+        {
+          ...state,
+          restaurants: persistedRestaurants,
+        },
+        restaurantId,
+      )
+
+      return {
+        ...nextState,
+        page: 'kitchen-management',
+        waiterTableId: null,
+        waiterWorkerId: null,
+      }
+    })
+  },
+
+  openReservationStatisticsForRestaurant: (restaurantId) => {
+    set((state) => {
+      const persistedRestaurants = persistCurrentRestaurant(state)
+      const nextState = loadRestaurantIntoWorkspace(
+        {
+          ...state,
+          restaurants: persistedRestaurants,
+        },
+        restaurantId,
+      )
+
+      return {
+        ...nextState,
+        page: 'reservation-statistics',
+        waiterTableId: null,
+        waiterWorkerId: null,
+      }
+    })
+  },
+
   switchRestaurantInManagement: (restaurantId) => {
     set((state) => {
       const persistedRestaurants = persistCurrentRestaurant(state)
@@ -571,6 +618,46 @@ export const useFloorStore = create((set, get) => ({
       return {
         ...nextState,
         page: 'management',
+        waiterTableId: null,
+        waiterWorkerId: null,
+      }
+    })
+  },
+
+  switchRestaurantInKitchen: (restaurantId) => {
+    set((state) => {
+      const persistedRestaurants = persistCurrentRestaurant(state)
+      const nextState = loadRestaurantIntoWorkspace(
+        {
+          ...state,
+          restaurants: persistedRestaurants,
+        },
+        restaurantId,
+      )
+
+      return {
+        ...nextState,
+        page: 'kitchen-management',
+        waiterTableId: null,
+        waiterWorkerId: null,
+      }
+    })
+  },
+
+  switchRestaurantInReservationStatistics: (restaurantId) => {
+    set((state) => {
+      const persistedRestaurants = persistCurrentRestaurant(state)
+      const nextState = loadRestaurantIntoWorkspace(
+        {
+          ...state,
+          restaurants: persistedRestaurants,
+        },
+        restaurantId,
+      )
+
+      return {
+        ...nextState,
+        page: 'reservation-statistics',
         waiterTableId: null,
         waiterWorkerId: null,
       }
@@ -887,7 +974,7 @@ export const useFloorStore = create((set, get) => ({
     const table = get().objects.find((obj) => obj.id === tableId)
     if (!table || !isTableObjectType(table.type)) return
 
-    const nextStatus = status === 'served' ? 'served' : 'pending'
+    const nextStatus = normalizeFrontendOrderLineStatus(status)
     const nextOrders = normalizeOrders(table.metadata?.orders).map((order) =>
       order.id === orderId
         ? {

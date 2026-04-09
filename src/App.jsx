@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ReadyOrderNotifications } from './components/Auth/ReadyOrderNotifications'
 import { UserStatusBadge } from './components/Auth/UserStatusBadge'
 import { GuestReservationPage } from './components/Guest/GuestReservationPage'
 import { RestaurantGoodsManager } from './components/Management/RestaurantGoodsManager'
@@ -10,12 +11,15 @@ import { AdminUsersPage } from './pages/AdminUsersPage'
 import { EditorPage } from './pages/EditorPage'
 import { FloorManagementPage } from './pages/FloorManagementPage'
 import { LoginPage } from './pages/LoginPage'
+import { KitchenPage } from './pages/KitchenPage'
+import { ReservationStatisticsPage } from './pages/ReservationStatisticsPage'
 import { RestaurantManagementPage } from './pages/RestaurantManagementPage'
 import { WorkersManagementPage } from './pages/WorkersManagementPage'
 import { backendApi } from './services/backendApi'
+import { useFloorStore } from './store/useFloorStore'
 
 function AppContent({ role }) {
-  const controller = useAppController()
+  const controller = useAppController(role)
   const [managementView, setManagementView] = useState('floors')
   const isStaff = role === 'STAFF'
 
@@ -34,6 +38,8 @@ function AppContent({ role }) {
         restaurants={controller.restaurants}
         isBackendLoading={controller.isBackendLoading}
         onOpenGuestReservationPage={controller.openGuestReservationPage}
+        onOpenKitchenMenu={controller.openKitchenForRestaurant}
+        onOpenReservationStatistics={controller.openReservationStatisticsForRestaurant}
         onCreateRestaurant={controller.createRestaurant}
         onOpenRestaurant={controller.openRestaurant}
         onRenameRestaurant={controller.renameRestaurant}
@@ -80,6 +86,22 @@ function AppContent({ role }) {
     return <WaiterPanel />
   }
 
+  if (controller.page === 'kitchen-management') {
+    return <KitchenPage />
+  }
+
+  if (controller.page === 'reservation-statistics') {
+    return (
+      <ReservationStatisticsPage
+        currentRestaurant={controller.currentRestaurant}
+        currentRestaurantId={controller.currentRestaurantId}
+        restaurants={controller.restaurants}
+        onSwitchRestaurant={controller.switchRestaurantInReservationStatistics}
+        onBackToRestaurants={controller.backToRestaurants}
+      />
+    )
+  }
+
   if (controller.page === 'guest-reservation') {
     return <GuestReservationPage />
   }
@@ -110,6 +132,8 @@ function App() {
   const [adminView, setAdminView] = useState(() =>
     backendApi.getAuthSession()?.role === 'ADMIN' ? 'home' : 'restaurants',
   )
+  const currentRestaurantId = useFloorStore((state) => state.currentRestaurantId)
+  const restaurants = useFloorStore((state) => state.restaurants)
 
   const onAuthenticated = (nextSession) => {
     setSession(nextSession)
@@ -129,6 +153,12 @@ function App() {
   if (session.role === 'ADMIN' && adminView === 'home') {
     return (
       <>
+        <ReadyOrderNotifications
+          session={session}
+          role={session.role}
+          currentRestaurantId={currentRestaurantId}
+          restaurants={restaurants}
+        />
         <UserStatusBadge session={session} onLogout={logout} />
         <AdminHomePage
           onManageUsers={() => setAdminView('users')}
@@ -141,6 +171,12 @@ function App() {
   if (session.role === 'ADMIN' && adminView === 'users') {
     return (
       <>
+        <ReadyOrderNotifications
+          session={session}
+          role={session.role}
+          currentRestaurantId={currentRestaurantId}
+          restaurants={restaurants}
+        />
         <UserStatusBadge session={session} onLogout={logout} />
         <AdminUsersPage onBack={() => setAdminView('home')} />
       </>
@@ -149,6 +185,12 @@ function App() {
 
   return (
     <>
+      <ReadyOrderNotifications
+        session={session}
+        role={session.role}
+        currentRestaurantId={currentRestaurantId}
+        restaurants={restaurants}
+      />
       <UserStatusBadge
         session={session}
         onLogout={logout}
