@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { useFloorStore } from '../../store/useFloorStore'
 import { getActiveReservation, isTableReservedNow, toDateMs } from '../../utils/reservations'
 import { backendApi } from '../../services/backendApi'
+import { FRONTEND_ORDER_LINE_STATUSES, orderLineStatusLabel } from '../../utils/orderLineStatus'
+
+const ORDER_STATUS_OPTIONS = FRONTEND_ORDER_LINE_STATUSES.filter((status) => status !== 'void')
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 const findFolderByPath = (folders, pathIds) => {
   let currentFolders = folders
@@ -44,6 +48,17 @@ const toDateInputValue = (date) => {
   return `${year}-${month}-${day}`
 }
 
+const toMinutes = (timeValue) => {
+  const text = String(timeValue ?? '').trim()
+  const match = text.match(/^(\d{2}):(\d{2})$/)
+  if (!match) return null
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null
+  return hour * 60 + minute
+}
+
 export const WaiterPanel = () => {
   const waiterTableId = useFloorStore((state) => state.waiterTableId)
   const currentRestaurantId = useFloorStore((state) => state.currentRestaurantId)
@@ -73,6 +88,7 @@ export const WaiterPanel = () => {
   const [timelineDate, setTimelineDate] = useState(() => toDateInputValue(new Date()))
   const [isSaving, setIsSaving] = useState(false)
   const [feedback, setFeedback] = useState('')
+  const [savedOpeningHours, setSavedOpeningHours] = useState([])
 
   const orders = table?.metadata?.orders ?? []
   const reservations = (table?.metadata?.reservations ?? []).slice().sort((a, b) => {
@@ -173,6 +189,72 @@ export const WaiterPanel = () => {
     return timelineDate === today
   }, [timelineDate])
 
+  const selectedDayOpening = useMemo(() => {
+    const parsed = timelineDate ? new Date(`${timelineDate}T00:00`) : new Date()
+    if (Number.isNaN(parsed.getTime())) return null
+
+    const dayName = DAY_NAMES[parsed.getDay()]
+    const openingHours = savedOpeningHours.length > 0
+      ? savedOpeningHours
+      : (currentRestaurant?.openingHours ?? [])
+    const entry = openingHours.find((item) => item.day === dayName) ?? null
+
+    return {
+      dayName,
+      entry,
+    }
+  }, [timelineDate, currentRestaurant?.openingHours, savedOpeningHours])
+
+  const timelineClosedBlocks = useMemo(() => {
+    const entry = selectedDayOpening?.entry
+    if (!entry) {
+      return [{ leftPct: 0, widthPct: 100 }]
+    }
+
+    if (entry.isClosed) {
+      return [{ leftPct: 0, widthPct: 100 }]
+    }
+
+    const openMinutes = toMinutes(entry.open)
+    const closeMinutes = toMinutes(entry.close)
+
+    if (openMinutes === null || closeMinutes === null || closeMinutes <= openMinutes) {
+      return [{ leftPct: 0, widthPct: 100 }]
+    }
+
+    const openPct = (openMinutes / (24 * 60)) * 100
+    const closePct = (closeMinutes / (24 * 60)) * 100
+    const blocks = []
+
+    if (openPct > 0) {
+      blocks.push({ leftPct: 0, widthPct: openPct })
+    }
+
+    if (closePct < 100) {
+      blocks.push({ leftPct: closePct, widthPct: 100 - closePct })
+    }
+
+    return blocks
+  }, [selectedDayOpening])
+
+  const selectedDayHoursText = useMemo(() => {
+    const dayName = selectedDayOpening?.dayName ?? 'Selected day'
+    const entry = selectedDayOpening?.entry
+
+    if (!entry) return `${dayName}: not configured (treated as closed)`
+    if (entry.isClosed) return `${dayName}: closed (occupied)`
+    return `${dayName}: open ${entry.open} - ${entry.close}`
+  }, [selectedDayOpening])
+
+  const isSelectedDayClosed = useMemo(() => {
+    const entry = selectedDayOpening?.entry
+    if (!entry) return true
+    if (entry.isClosed) return true
+    const openMinutes = toMinutes(entry.open)
+    const closeMinutes = toMinutes(entry.close)
+    return openMinutes === null || closeMinutes === null || closeMinutes <= openMinutes
+  }, [selectedDayOpening])
+
   const refreshTableData = async () => {
     if (!currentRestaurantId || !waiterTableId) return
     const payload = await backendApi.fetchTableServiceState(currentRestaurantId, waiterTableId)
@@ -186,6 +268,30 @@ export const WaiterPanel = () => {
       setFeedback(error.message)
     })
   }, [currentRestaurantId, waiterTableId])
+
+  useEffect(() => {
+    if (!currentRestaurantId) {
+      setSavedOpeningHours([])
+      return
+    }
+
+    let active = true
+
+    backendApi
+      .getOpeningHours(currentRestaurantId)
+      .then((hours) => {
+        if (!active) return
+        setSavedOpeningHours(Array.isArray(hours) ? hours : [])
+      })
+      .catch(() => {
+        if (!active) return
+        setSavedOpeningHours([])
+      })
+
+    return () => {
+      active = false
+    }
+  }, [currentRestaurantId])
 
   useEffect(() => {
     setWaiterWorker(currentWorkerId)
@@ -476,8 +582,24 @@ export const WaiterPanel = () => {
                     </div>
                 </div>
 
+                <p className={`mb-2 text-[11px] font-semibold ${isSelectedDayClosed ? 'text-rose-700' : 'text-emerald-700'}`}>
+                  {selectedDayHoursText}
+                </p>
+
                 <div className="relative h-16 overflow-hidden rounded-md border border-slate-200 bg-slate-50">
                   <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.25)_1px,transparent_1px)] bg-[length:25%_100%]" />
+
+                  {timelineClosedBlocks.map((block, index) => (
+                    <div
+                      key={`${block.leftPct}-${block.widthPct}-${index}`}
+                      className="absolute bottom-0 top-0 border-x border-rose-300 bg-rose-200/70"
+                      style={{
+                        left: `${block.leftPct}%`,
+                        width: `${block.widthPct}%`,
+                      }}
+                      title="Restaurant closed (occupied window)"
+                    />
+                  ))}
 
                   {todayTimelineReservations.map((reservation) => (
                     <div
@@ -746,8 +868,11 @@ export const WaiterPanel = () => {
                           updateOrderLine(order, { status: event.target.value })
                         }
                       >
-                        <option value="pending">Pending</option>
-                        <option value="served">Served</option>
+                        {ORDER_STATUS_OPTIONS.map((status) => (
+                          <option key={status} value={status}>
+                            {orderLineStatusLabel(status)}
+                          </option>
+                        ))}
                       </select>
                     </div>
 

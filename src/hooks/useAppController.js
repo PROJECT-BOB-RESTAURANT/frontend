@@ -4,7 +4,7 @@ import { useFloorStore } from '../store/useFloorStore'
 import { snapToGrid, toWorldPoint } from '../utils/grid'
 import { getObjectPreset } from '../utils/objectLibrary'
 
-function useAppController() {
+function useAppController(role) {
   const addObjectFromPreset = useFloorStore((state) => state.addObjectFromPreset)
   const moveObjectByDelta = useFloorStore((state) => state.moveObjectByDelta)
   const canvasZoom = useFloorStore((state) => state.canvasZoom)
@@ -20,8 +20,11 @@ function useAppController() {
   const currentFloorId = useFloorStore((state) => state.currentFloorId)
   const objects = useFloorStore((state) => state.objects)
   const openRestaurant = useFloorStore((state) => state.openRestaurant)
+  const openKitchenForRestaurant = useFloorStore((state) => state.openKitchenForRestaurant)
+  const openReservationStatisticsForRestaurant = useFloorStore((state) => state.openReservationStatisticsForRestaurant)
   const openGuestReservationPage = useFloorStore((state) => state.openGuestReservationPage)
   const switchRestaurantInManagement = useFloorStore((state) => state.switchRestaurantInManagement)
+  const switchRestaurantInReservationStatistics = useFloorStore((state) => state.switchRestaurantInReservationStatistics)
   const switchRestaurantInEditor = useFloorStore((state) => state.switchRestaurantInEditor)
   const backToRestaurants = useFloorStore((state) => state.backToRestaurants)
   const openFloor = useFloorStore((state) => state.openFloor)
@@ -233,16 +236,19 @@ function useAppController() {
   const onDragEnd = useCallback(
     (event) => {
       const { active, over, delta, activatorEvent } = event
-      if (editorMode !== 'edit') return
       if (!over || over.id !== 'floor-canvas') return
 
       const data = active.data.current
       if (!data || !activatorEvent || !('clientX' in activatorEvent)) return
 
+      const canPlaceInTableMode = role === 'ADMIN' || role === 'MANAGER'
+
       const overRect = over.rect?.current ?? over.rect
       if (!overRect || overRect.left === undefined || overRect.top === undefined) return
 
       if (data.source === 'library') {
+        if (editorMode !== 'edit' && !canPlaceInTableMode) return
+
         const preset = getObjectPreset(data.presetId)
         if (!preset) return
 
@@ -269,6 +275,8 @@ function useAppController() {
       }
 
       if (data.source === 'canvas') {
+        if (editorMode !== 'edit') return
+
         moveObjectByDelta(
           data.objectId,
           snapEnabled ? snapToGrid(delta.x / canvasZoom) : delta.x / canvasZoom,
@@ -276,7 +284,7 @@ function useAppController() {
         )
       }
     },
-    [editorMode, canvasPosition, canvasZoom, snapEnabled, addObjectFromPreset, moveObjectByDelta],
+    [editorMode, role, canvasPosition, canvasZoom, snapEnabled, addObjectFromPreset, moveObjectByDelta],
   )
 
   return {
@@ -290,8 +298,11 @@ function useAppController() {
     isBackendLoading,
     backendFeedback,
     openRestaurant,
+    openKitchenForRestaurant,
+    openReservationStatisticsForRestaurant,
     openGuestReservationPage,
     switchRestaurantInManagement,
+    switchRestaurantInReservationStatistics,
     switchRestaurantInEditor,
     backToRestaurants,
     openFloor,

@@ -1,3 +1,8 @@
+import {
+  orderLineStatusToBackend,
+  orderLineStatusToFrontend,
+} from '../utils/orderLineStatus'
+
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '/api/v1').replace(/\/$/, '')
 const AUTH_STORAGE_KEY = 'bob.auth.session'
 
@@ -23,9 +28,6 @@ const workerRoleToBackend = (role) => {
   if (normalized === 'ADMIN' || normalized === 'MANAGER' || normalized === 'STAFF') return normalized
   return 'STAFF'
 }
-
-const orderLineStatusToFrontend = (status) => (status === 'SERVED' ? 'served' : 'pending')
-const orderLineStatusToBackend = (status) => (status === 'served' ? 'SERVED' : 'PENDING')
 
 const parseJsonSafely = (value, fallback) => {
   if (typeof value !== 'string' || !value.trim()) return fallback
@@ -455,6 +457,10 @@ const deleteWorker = (restaurantId, workerId) =>
   request(`/restaurants/${restaurantId}/workers/${workerId}`, { method: 'DELETE' })
 
 const listOpeningHours = (restaurantId) => request(`/restaurants/${restaurantId}/opening-hours`)
+const getOpeningHours = async (restaurantId) => {
+  const entries = await listOpeningHours(restaurantId)
+  return mapOpeningHours(entries)
+}
 const upsertWeeklyOpeningHours = (restaurantId, openingHours) => {
   const payload = WEEK_DAYS.map((day, index) => {
     const item = openingHours.find((entry) => entry.day === day) ?? {}
@@ -517,8 +523,10 @@ const deleteMenuItem = (restaurantId, folderId, itemId) =>
     method: 'DELETE',
   })
 
-const listTableReservations = (restaurantId, tableObjectId) =>
-  request(`/restaurants/${restaurantId}/tables/${tableObjectId}/reservations`)
+const listTableReservations = async (restaurantId, tableObjectId) => {
+  const reservations = await request(`/restaurants/${restaurantId}/tables/${tableObjectId}/reservations`)
+  return (Array.isArray(reservations) ? reservations : []).map(mapReservationForUi)
+}
 const createReservation = (restaurantId, payload) =>
   request(`/restaurants/${restaurantId}/reservations`, {
     method: 'POST',
@@ -607,6 +615,7 @@ const mapReservationForUi = (reservation) => ({
 const mapOrderLineForUi = (line) => ({
   id: line.id,
   tableOrderId: line.tableOrderId,
+  tableObjectId: line.tableObjectId ?? null,
   name: line.itemName,
   quantity: Number(line.quantity ?? 1),
   unitPrice: Number(line.unitPrice ?? 0),
@@ -614,8 +623,43 @@ const mapOrderLineForUi = (line) => ({
   status: orderLineStatusToFrontend(line.status),
   placedByWorkerId: line.placedByWorkerId ?? null,
   placedByWorkerName: line.placedByWorkerNameSnapshot ?? null,
+  statusUpdatedAt: toDateMs(line.statusUpdatedAt),
+  inProgressAt: toDateMs(line.inProgressAt),
+  inPrepAt: toDateMs(line.inPrepAt),
+  readyForServerAt: toDateMs(line.readyForServerAt),
+  servedAt: toDateMs(line.servedAt),
   createdAt: toDateMs(line.createdAt),
 })
+
+const mapKitchenOrderLineForUi = (line) => ({
+  id: line.id,
+  tableOrderId: line.tableOrderId,
+  tableObjectId: line.tableObjectId,
+  floorId: line.floorId,
+  floorName: line.floorName,
+  name: line.itemName,
+  quantity: Number(line.quantity ?? 1),
+  unitPrice: Number(line.unitPrice ?? 0),
+  note: line.note ?? '',
+  status: orderLineStatusToFrontend(line.status),
+  placedByWorkerId: line.placedByWorkerId ?? null,
+  placedByWorkerName: line.placedByWorkerNameSnapshot ?? null,
+  statusUpdatedAt: toDateMs(line.statusUpdatedAt),
+  inProgressAt: toDateMs(line.inProgressAt),
+  inPrepAt: toDateMs(line.inPrepAt),
+  readyForServerAt: toDateMs(line.readyForServerAt),
+  servedAt: toDateMs(line.servedAt),
+  createdAt: toDateMs(line.createdAt),
+})
+
+const listKitchenOrderLines = async (restaurantId, options = {}) => {
+  const includeServed = options.includeServed === true
+  const path = includeServed
+    ? `/restaurants/${restaurantId}/kitchen/order-lines?includeServed=true`
+    : `/restaurants/${restaurantId}/kitchen/order-lines`
+  const lines = await request(path)
+  return (Array.isArray(lines) ? lines : []).map(mapKitchenOrderLineForUi)
+}
 
 const fetchRestaurantsGraph = async () => {
   const restaurants = await listRestaurants()
@@ -698,7 +742,7 @@ const fetchTableServiceState = async (restaurantId, tableObjectId) => {
   )
 
   return {
-    reservations: reservations.map(mapReservationForUi),
+    reservations,
     orders: flattenedOrders,
     openOrderIds: openOrders.map((order) => order.id),
   }
@@ -733,6 +777,7 @@ export const backendApi = {
   createWorker,
   updateWorker,
   deleteWorker,
+  getOpeningHours,
   upsertWeeklyOpeningHours,
   createMenuFolder,
   updateMenuFolder,
@@ -741,10 +786,12 @@ export const backendApi = {
   updateMenuItem,
   deleteMenuItem,
   createReservation,
+  listTableReservations,
   updateReservation,
   deleteReservation,
   addOrderLine,
   updateOrderLine,
   deleteOrderLine,
   deleteTableOrder,
+  listKitchenOrderLines,
 }

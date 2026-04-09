@@ -5,6 +5,8 @@ function RestaurantManagementPage({
   restaurants,
   isBackendLoading,
   onOpenGuestReservationPage,
+  onOpenKitchenMenu,
+  onOpenReservationStatistics,
   onCreateRestaurant,
   onOpenRestaurant,
   onRenameRestaurant,
@@ -60,7 +62,7 @@ function RestaurantManagementPage({
                 Updated: {new Date(restaurant.updatedAt).toLocaleString()}
               </p>
 
-              <div className={`mt-3 grid gap-2 ${isStaff ? 'grid-cols-1' : 'grid-cols-3'}`}>
+              <div className={`mt-3 grid gap-2 ${isStaff ? 'grid-cols-2' : 'grid-cols-4'}`}>
                 <button
                   type="button"
                   className="rounded-md bg-sky-600 px-2 py-1 text-xs font-semibold text-white hover:bg-sky-500"
@@ -68,6 +70,24 @@ function RestaurantManagementPage({
                 >
                   Open Floors
                 </button>
+                {typeof onOpenReservationStatistics === 'function' ? (
+                  <button
+                    type="button"
+                    className="rounded-md bg-indigo-600 px-2 py-1 text-xs font-semibold text-white hover:bg-indigo-500"
+                    onClick={() => onOpenReservationStatistics(restaurant.id)}
+                  >
+                    Reservation Stats
+                  </button>
+                ) : null}
+                {typeof onOpenKitchenMenu === 'function' ? (
+                  <button
+                    type="button"
+                    className="rounded-md bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
+                    onClick={() => onOpenKitchenMenu(restaurant.id)}
+                  >
+                    Open Kitchen
+                  </button>
+                ) : null}
                 {!isStaff ? (
                   <button
                     type="button"

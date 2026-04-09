@@ -4,7 +4,7 @@ import { useFloorStore } from '../../store/useFloorStore'
 import { LibraryItem } from './LibraryItem'
 import { useState } from 'react'
 
-export const ObjectLibrary = () => {
+export const ObjectLibrary = ({ role }) => {
   const selectedObject = useFloorStore((state) =>
     state.objects.find((item) => item.id === state.selectedObjectId) ?? null,
   )
@@ -19,6 +19,7 @@ export const ObjectLibrary = () => {
   const [layoutText, setLayoutText] = useState('')
   const [layoutFeedback, setLayoutFeedback] = useState('')
   const isTable = selectedObject ? isTableObjectType(selectedObject.type) : false
+  const isAdmin = role === 'ADMIN'
 
   const downloadLayout = () => {
     const data = exportLayout()
@@ -99,7 +100,7 @@ export const ObjectLibrary = () => {
                 <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Rotation
                   <input
-                    className="rounded-md border border-slate-200 px-2 py-1"
+                    className="min-h-10 rounded-md border border-slate-200 px-2 py-1.5"
                     type="number"
                     step="5"
                     value={selectedObject.rotation ?? 0}
@@ -113,7 +114,7 @@ export const ObjectLibrary = () => {
                 <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Scale X
                   <input
-                    className="rounded-md border border-slate-200 px-2 py-1"
+                    className="min-h-10 rounded-md border border-slate-200 px-2 py-1.5"
                     type="number"
                     step="0.1"
                     min="0.4"
@@ -129,7 +130,7 @@ export const ObjectLibrary = () => {
                 <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Scale Y
                   <input
-                    className="rounded-md border border-slate-200 px-2 py-1"
+                    className="min-h-10 rounded-md border border-slate-200 px-2 py-1.5"
                     type="number"
                     step="0.1"
                     min="0.4"
@@ -147,7 +148,7 @@ export const ObjectLibrary = () => {
               <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Name
                 <input
-                  className="rounded-md border border-slate-200 px-2 py-1"
+                  className="min-h-10 rounded-md border border-slate-200 px-2 py-1.5"
                   type="text"
                   value={selectedObject.metadata?.label ?? ''}
                   onChange={(event) =>
@@ -162,7 +163,7 @@ export const ObjectLibrary = () => {
                 <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Max Seats
                   <input
-                    className="rounded-md border border-slate-200 px-2 py-1"
+                    className="min-h-10 rounded-md border border-slate-200 px-2 py-1.5"
                     type="number"
                     min="1"
                     step="1"
@@ -179,7 +180,7 @@ export const ObjectLibrary = () => {
               <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Anchor
                 <select
-                  className="rounded-md border border-slate-200 px-2 py-1"
+                  className="min-h-10 rounded-md border border-slate-200 px-2 py-1.5"
                   value={selectedObject.metadata?.anchor ?? 'top-left'}
                   onChange={(event) =>
                     updateObject(selectedObject.id, {
@@ -227,14 +228,14 @@ export const ObjectLibrary = () => {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  className="rounded-md bg-slate-100 px-2 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                  className="min-h-10 rounded-md bg-slate-100 px-2 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200"
                   onClick={duplicateSelectedObject}
                 >
                   Duplicate
                 </button>
                 <button
                   type="button"
-                  className="rounded-md bg-rose-100 px-2 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-200"
+                  className="min-h-10 rounded-md bg-rose-100 px-2 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-200"
                   onClick={deleteSelectedObject}
                 >
                   Delete
@@ -246,53 +247,55 @@ export const ObjectLibrary = () => {
           )}
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Floor Settings
-          </h3>
+        {isAdmin ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Floor Settings
+            </h3>
 
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              className="rounded-md bg-sky-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-sky-500"
-              onClick={saveLayout}
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              className="rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
-              onClick={loadSavedLayout}
-            >
-              Load
-            </button>
-            <button
-              type="button"
-              className="rounded-md bg-indigo-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500"
-              onClick={downloadLayout}
-            >
-              Export
-            </button>
-            <button
-              type="button"
-              className="rounded-md bg-amber-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-amber-500"
-              onClick={importLayout}
-            >
-              Import
-            </button>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                className="min-h-10 rounded-md bg-sky-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-sky-500"
+                onClick={saveLayout}
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                className="min-h-10 rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
+                onClick={loadSavedLayout}
+              >
+                Load
+              </button>
+              <button
+                type="button"
+                className="min-h-10 rounded-md bg-indigo-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500"
+                onClick={downloadLayout}
+              >
+                Export
+              </button>
+              <button
+                type="button"
+                className="min-h-10 rounded-md bg-amber-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-amber-500"
+                onClick={importLayout}
+              >
+                Import
+              </button>
+            </div>
+
+            <textarea
+              className="mt-2 h-28 w-full rounded-md border border-slate-200 p-2 text-xs"
+              placeholder="Paste layout JSON here to import..."
+              value={layoutText}
+              onChange={(event) => setLayoutText(event.target.value)}
+            />
+
+            {layoutFeedback ? (
+              <p className="mt-1 text-[11px] text-slate-500">{layoutFeedback}</p>
+            ) : null}
           </div>
-
-          <textarea
-            className="mt-2 h-28 w-full rounded-md border border-slate-200 p-2 text-xs"
-            placeholder="Paste layout JSON here to import..."
-            value={layoutText}
-            onChange={(event) => setLayoutText(event.target.value)}
-          />
-
-          {layoutFeedback ? (
-            <p className="mt-1 text-[11px] text-slate-500">{layoutFeedback}</p>
-          ) : null}
-        </div>
+        ) : null}
         </div>
       </div>
     </aside>
