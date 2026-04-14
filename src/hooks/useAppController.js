@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { backendApi } from '../services/backendApi'
 import { useFloorStore } from '../store/useFloorStore'
 import { snapToGrid, toWorldPoint } from '../utils/grid'
-import { getObjectPreset } from '../utils/objectLibrary'
+import { getObjectPreset, isTableObjectType } from '../utils/objectLibrary'
 
 function useAppController(role) {
   const addObjectFromPreset = useFloorStore((state) => state.addObjectFromPreset)
@@ -34,6 +34,7 @@ function useAppController(role) {
   const waiterTableId = useFloorStore((state) => state.waiterTableId)
   const waiterWorkerId = useFloorStore((state) => state.waiterWorkerId)
   const selectedObjectId = useFloorStore((state) => state.selectedObjectId)
+  const setTableReservationsData = useFloorStore((state) => state.setTableReservationsData)
 
   const [isBackendLoading, setIsBackendLoading] = useState(false)
   const [backendFeedback, setBackendFeedback] = useState('')
@@ -49,6 +50,29 @@ function useAppController(role) {
     () => restaurants.find((restaurant) => restaurant.id === currentRestaurantId) ?? null,
     [restaurants, currentRestaurantId],
   )
+
+  const currentFloorTableIds = useMemo(
+    () =>
+      (currentFloor?.objects ?? [])
+        .filter((object) => isTableObjectType(object.type))
+        .map((object) => object.id),
+    [currentFloor],
+  )
+
+  const syncCurrentFloorReservations = useCallback(async () => {
+    if (!currentRestaurantId || currentFloorTableIds.length === 0) return
+
+    const entries = await Promise.all(
+      currentFloorTableIds.map(async (tableId) => ({
+        tableId,
+        reservations: await backendApi.listTableReservations(currentRestaurantId, tableId),
+      })),
+    )
+
+    for (const entry of entries) {
+      setTableReservationsData(entry.tableId, entry.reservations)
+    }
+  }, [currentRestaurantId, currentFloorTableIds, setTableReservationsData])
 
   const reloadFromBackend = useCallback(
     async (message = '') => {
@@ -107,6 +131,25 @@ function useAppController(role) {
       active = false
     }
   }, [hydrateFromBackend])
+
+  useEffect(() => {
+    let active = true
+
+    const sync = async () => {
+      try {
+        await syncCurrentFloorReservations()
+      } catch (error) {
+        if (!active) return
+        setBackendFeedback(error.message)
+      }
+    }
+
+    sync()
+
+    return () => {
+      active = false
+    }
+  }, [syncCurrentFloorReservations])
 
   const withLoading = useCallback(async (operation) => {
     setIsBackendLoading(true)

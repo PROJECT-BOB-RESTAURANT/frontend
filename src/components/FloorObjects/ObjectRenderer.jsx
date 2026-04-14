@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import clsx from 'clsx'
-import { isTableReservedNow } from '../../utils/reservations'
+import { useFloorStore } from '../../store/useFloorStore'
+import { isTableReservedNow, toDateMs } from '../../utils/reservations'
 
 const frame =
   'flex h-full w-full items-center justify-center overflow-hidden rounded-md border text-xs font-semibold uppercase tracking-wide'
@@ -8,7 +9,9 @@ const frame =
 const ObjectRendererComponent = ({ object }) => {
   const fillColor = object.metadata?.fillColor
   const strokeColor = object.metadata?.strokeColor
-  const reservedNow = isTableReservedNow(object.metadata)
+  const reservationPreviewAt = useFloorStore((state) => state.reservationPreviewAt)
+  const referenceTimeMs = toDateMs(reservationPreviewAt) ?? Date.now()
+  const reservedNow = isTableReservedNow(object.metadata, referenceTimeMs)
 
   const colorStyle =
     fillColor || strokeColor

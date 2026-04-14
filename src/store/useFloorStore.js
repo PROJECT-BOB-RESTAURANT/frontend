@@ -360,6 +360,7 @@ const loadRestaurantIntoWorkspace = (state, restaurantId) => {
 export const useFloorStore = create((set, get) => ({
   page: 'restaurant-management',
   editorMode: 'edit',
+  reservationPreviewAt: null,
   waiterTableId: null,
   waiterWorkerId: null,
   restaurants: [],
@@ -795,6 +796,21 @@ export const useFloorStore = create((set, get) => ({
   },
 
   setEditorMode: (mode) => set({ editorMode: mode }),
+
+  setReservationPreviewAt: (value) => {
+    const normalizedValue = typeof value === 'string' ? value.trim() : ''
+    if (!normalizedValue) {
+      set({ reservationPreviewAt: null })
+      return
+    }
+
+    const ms = toDateMs(normalizedValue)
+    if (ms === null) {
+      return
+    }
+
+    set({ reservationPreviewAt: new Date(ms).toISOString() })
+  },
 
   setWaiterWorker: (workerId) => {
     const state = get()
@@ -1662,6 +1678,19 @@ export const useFloorStore = create((set, get) => ({
       metadata: {
         reservations: nextReservations,
         orders: nextOrders,
+      },
+    })
+  },
+
+  setTableReservationsData: (tableId, reservations) => {
+    const table = get().objects.find((object) => object.id === tableId)
+    if (!table || !isTableObjectType(table.type)) return
+
+    const nextReservations = normalizeReservations(reservations)
+
+    get().updateObject(tableId, {
+      metadata: {
+        reservations: nextReservations,
       },
     })
   },

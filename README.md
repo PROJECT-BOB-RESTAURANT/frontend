@@ -17,6 +17,9 @@ Current capabilities:
 - Waiter table management (orders + reservations + occupancy).
 - Staff kitchen touchscreen workflow (incoming queue, color-coded statuses, timing panel).
 - Reservation statistics page with per-floor/per-table occupancy timelines and direct reservation creation.
+- Manager analytics cards in reservation statistics for served income, open ticket value, reservation totals, active reservations, and floor-level reservation breakdown.
+- Analytics diagrams in reservation statistics for revenue split and per-floor reservation distribution.
+- Floor-wide reservation action that reserves all tables on a selected floor for the same customer and time window.
 - Guest reservation flow (restaurant -> floor -> table -> booking).
 - Restaurant operations setup (workers, opening hours, nested menu catalog).
 
@@ -85,6 +88,12 @@ Use waiter mode for in-service table operations:
 3. Set worker attribution.
 4. Add reservations or manual occupancy.
 5. Monitor timeline and table status.
+
+Use reservation statistics for floor-level booking blocks:
+1. Open reservation statistics.
+2. Select a floor and choose `Reserve Entire Floor`.
+3. Fill customer and time range once.
+4. Save to create reservations across all persisted tables on that floor.
 
 Use kitchen mode for back-of-house ticket flow:
 1. Open kitchen for a restaurant (staff entry).
@@ -202,6 +211,8 @@ Admin-only pre-page:
 - Guest reservations are created through backend reservation endpoints.
 - Waiter orders and reservations are loaded and persisted through backend table/order/reservation endpoints.
 - Floor-object editing remains interactive in-canvas and is persisted with the `Save Floor Layout` button.
+- Table-level backend calls only run for persisted table UUIDs; unsaved local table IDs are blocked in frontend with a save-layout message.
+- Floor planner now refreshes reservation data for all tables on the current floor after backend hydration and restaurant/floor switch, so free/reserved colors stay in sync after user changes.
 - Opening-hours changes are persisted with the `Save Opening Hours` button.
 
 ## 5.1 Restaurant Management Options
@@ -249,6 +260,8 @@ From editor:
 Floor planner UX behavior:
 - Touch-friendly controls with larger tap targets in the top toolbar and side panels
 - Canvas panning supports touch/pen drag for tablet navigation
+- Floor planner toolbar includes a `Time` selector to preview table free/reserved colors at any chosen datetime
+- Floor planner `Time` includes `-` and `+` step buttons (30 minutes) for quick backward/forward availability preview
 - JSON layout tools are visible only for admin users
 - Staff users in planner view only get table service action access (no object data editing panels)
 - Manager and admin can place new library elements in both edit mode and table/view mode
