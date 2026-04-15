@@ -5,6 +5,8 @@ import { GRID_SIZE, clamp } from '../../utils/grid'
 import { useFloorStore } from '../../store/useFloorStore'
 
 const ZOOM_STEP = 0.1
+const DEFAULT_CANVAS_ZOOM = 1
+const DEFAULT_CANVAS_POSITION = { x: 160, y: 90 }
 
 export const CanvasEditor = () => {
   const objects = useFloorStore((state) => state.objects)
@@ -98,6 +100,11 @@ export const CanvasEditor = () => {
     }
   }, [canvasPosition.x, canvasPosition.y, canvasZoom, snapEnabled])
 
+  const restoreView = useCallback(() => {
+    setCanvasZoom(DEFAULT_CANVAS_ZOOM)
+    setCanvasPosition(DEFAULT_CANVAS_POSITION)
+  }, [setCanvasZoom, setCanvasPosition])
+
   return (
     <section className="relative h-full w-full overflow-hidden" onWheel={onWheel}>
       <div className="absolute right-4 top-4 z-50 flex gap-2 rounded-xl border border-slate-200 bg-white/90 p-2 shadow-lg">
@@ -118,6 +125,15 @@ export const CanvasEditor = () => {
         >
           +
         </button>
+        {editorMode === 'view' ? (
+          <button
+            type="button"
+            className="rounded-md bg-sky-600 px-3 py-1 text-xs font-semibold text-white hover:bg-sky-500"
+            onClick={restoreView}
+          >
+            Restore View
+          </button>
+        ) : null}
       </div>
 
       <div
