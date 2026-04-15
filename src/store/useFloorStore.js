@@ -363,6 +363,7 @@ export const useFloorStore = create((set, get) => ({
   reservationPreviewAt: null,
   waiterTableId: null,
   waiterWorkerId: null,
+  waiterActiveSection: 'orders',
   restaurants: [],
   currentRestaurantId: null,
   floors: [],
@@ -822,6 +823,10 @@ export const useFloorStore = create((set, get) => ({
     set({ waiterWorkerId: exists ? workerId : null })
   },
 
+  setWaiterActiveSection: (section) => {
+    set({ waiterActiveSection: section === 'reservations' ? 'reservations' : 'orders' })
+  },
+
   updateOpeningHoursDay: (day, updates) => {
     const nextDay = String(day ?? '').trim()
     if (!WEEK_DAYS.includes(nextDay)) return
@@ -856,7 +861,7 @@ export const useFloorStore = create((set, get) => ({
     }))
   },
 
-  openWaiterForTable: (tableId) => {
+  openWaiterForTable: (tableId, section = 'orders') => {
     const table = get().objects.find((obj) => obj.id === tableId)
     if (!table || !isTableObjectType(table.type)) return
 
@@ -870,6 +875,7 @@ export const useFloorStore = create((set, get) => ({
       page: 'waiter-management',
       waiterTableId: tableId,
       waiterWorkerId: fallbackWorkerId,
+      waiterActiveSection: section === 'reservations' ? 'reservations' : 'orders',
       selectedObjectId: tableId,
     })
   },
@@ -880,6 +886,7 @@ export const useFloorStore = create((set, get) => ({
       editorMode: 'view',
       waiterTableId: null,
       waiterWorkerId: null,
+      waiterActiveSection: 'orders',
     })
   },
 

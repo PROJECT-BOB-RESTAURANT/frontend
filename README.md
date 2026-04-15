@@ -139,6 +139,12 @@ Key files:
 - `src/pages/*.jsx`: route-level page components for restaurant management, floor management, and editor screens.
 - `src/store/useFloorStore.js`: navigation actions and all domain state.
 
+Refactor note:
+- Hooks and services are split into smaller internal modules.
+- `src/hooks/useAppController/` contains focused controller helpers (CRUD actions and drag-end logic).
+- `src/services/backendApi/` contains domain-oriented API modules (auth, restaurant resources, table service, layout, core utilities).
+- `src/services/backendApi.js` remains the stable facade used by UI components.
+
 Management hub behavior:
 - Restaurant list is intentionally minimal and only opens selected restaurant management.
 - Restaurant-specific actions are grouped on the management screen:

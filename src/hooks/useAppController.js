@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { backendApi } from '../services/backendApi'
 import { useFloorStore } from '../store/useFloorStore'
-import { snapToGrid, toWorldPoint } from '../utils/grid'
-import { getObjectPreset, isTableObjectType } from '../utils/objectLibrary'
+import { isTableObjectType } from '../utils/objectLibrary'
+import { createOnDragEnd } from './useAppController/createOnDragEnd'
+import { useCrudActions } from './useAppController/useCrudActions'
 
 function useAppController(role) {
   const addObjectFromPreset = useFloorStore((state) => state.addObjectFromPreset)
@@ -151,188 +152,40 @@ function useAppController(role) {
     }
   }, [syncCurrentFloorReservations])
 
-  const withLoading = useCallback(async (operation) => {
-    setIsBackendLoading(true)
-    try {
-      await operation()
-    } catch (error) {
-      setBackendFeedback(error.message)
-    } finally {
-      setIsBackendLoading(false)
-    }
-  }, [])
-
-  const createRestaurant = useCallback(async () => {
-    const name = window.prompt('Restaurant name', `Restaurant ${restaurants.length + 1}`)
-    if (!name) return
-
-    await withLoading(async () => {
-      const created = await backendApi.createRestaurant(name)
-      await reloadFromBackend('Restaurant created.')
-      const restaurantId = created?.id ?? created
-      if (restaurantId) {
-        openRestaurant(restaurantId)
-      }
-    })
-  }, [restaurants.length, withLoading, reloadFromBackend, openRestaurant])
-
-  const renameRestaurant = useCallback(
-    async (restaurant) => {
-      const nextName = window.prompt('Rename restaurant', restaurant.name)
-      if (!nextName) return
-
-      await withLoading(async () => {
-        await backendApi.updateRestaurant(restaurant.id, nextName)
-        await reloadFromBackend('Restaurant renamed.')
-      })
-    },
-    [withLoading, reloadFromBackend],
-  )
-
-  const deleteRestaurant = useCallback(
-    async (restaurantId) => {
-      const shouldDelete = window.confirm('Do you really want to delete this restaurant?')
-      if (!shouldDelete) return
-
-      await withLoading(async () => {
-        await backendApi.deleteRestaurant(restaurantId)
-        await reloadFromBackend('Restaurant deleted.')
-      })
-    },
-    [withLoading, reloadFromBackend],
-  )
-
-  const createFloor = useCallback(async () => {
-    const name = window.prompt('Floor name', `Floor ${floors.length + 1}`)
-    if (!name) return
-    const width = window.prompt('Optional floor width (leave empty to skip)', '')
-    const height = window.prompt('Optional floor height (leave empty to skip)', '')
-    const size =
-      width && height
-        ? { width: Number(width) || null, height: Number(height) || null }
-        : null
-
-    await withLoading(async () => {
-      await backendApi.createFloor(currentRestaurantId, {
-        name,
-        size,
-        canvasZoom: 1,
-        canvasPosition: { x: 160, y: 90 },
-      })
-      await reloadFromBackend('Floor created.')
-    })
-  }, [floors.length, withLoading, currentRestaurantId, reloadFromBackend])
-
-  const renameFloor = useCallback(
-    async (floor) => {
-      const nextName = window.prompt('Rename floor', floor.name)
-      if (!nextName) return
-
-      await withLoading(async () => {
-        await backendApi.updateFloor(currentRestaurantId, floor.id, {
-          ...floor,
-          name: nextName,
-        })
-        await reloadFromBackend('Floor renamed.')
-      })
-    },
-    [withLoading, currentRestaurantId, reloadFromBackend],
-  )
-
-  const deleteFloor = useCallback(
-    async (floorId) => {
-      await withLoading(async () => {
-        await backendApi.deleteFloor(currentRestaurantId, floorId)
-        await reloadFromBackend('Floor deleted.')
-      })
-    },
-    [withLoading, currentRestaurantId, reloadFromBackend],
-  )
-
-  const onSaveCurrentFloorLayout = useCallback(async () => {
-    if (!currentRestaurantId || !currentFloor) return
-
-    const shouldSave = window.confirm('Do you want to save the floor layout?')
-    if (!shouldSave) return
-
-    const floorToSave = {
-      ...currentFloor,
-      objects,
-      canvasZoom,
-      canvasPosition,
-    }
-
-    setIsBackendLoading(true)
-    try {
-      const createdIdMap = await backendApi.saveFloorLayout(currentRestaurantId, floorToSave)
-      applyCreatedObjectIds(createdIdMap)
-      await reloadFromBackend('Floor layout saved to backend.')
-    } catch (error) {
-      setBackendFeedback(error.message)
-    } finally {
-      setIsBackendLoading(false)
-    }
-  }, [
+  const {
+    createRestaurant,
+    renameRestaurant,
+    deleteRestaurant,
+    createFloor,
+    renameFloor,
+    deleteFloor,
+    onSaveCurrentFloorLayout,
+  } = useCrudActions({
+    restaurantsLength: restaurants.length,
+    floorsLength: floors.length,
     currentRestaurantId,
     currentFloor,
     objects,
     canvasZoom,
     canvasPosition,
+    openRestaurant,
     applyCreatedObjectIds,
     reloadFromBackend,
-  ])
+    setIsBackendLoading,
+    setBackendFeedback,
+  })
 
-  const onDragEnd = useCallback(
-    (event) => {
-      const { active, over, delta, activatorEvent } = event
-      if (!over || over.id !== 'floor-canvas') return
-
-      const data = active.data.current
-      if (!data || !activatorEvent || !('clientX' in activatorEvent)) return
-
-      const canPlaceInTableMode = role === 'ADMIN' || role === 'MANAGER'
-
-      const overRect = over.rect?.current ?? over.rect
-      if (!overRect || overRect.left === undefined || overRect.top === undefined) return
-
-      if (data.source === 'library') {
-        if (editorMode !== 'edit' && !canPlaceInTableMode) return
-
-        const preset = getObjectPreset(data.presetId)
-        if (!preset) return
-
-        const world = toWorldPoint(
-          activatorEvent.clientX + delta.x,
-          activatorEvent.clientY + delta.y,
-          {
-            left: overRect.left,
-            top: overRect.top,
-          },
-          canvasPosition,
-          canvasZoom,
-        )
-
-        const centeredX = snapEnabled
-          ? snapToGrid(world.x - preset.config.width / 2)
-          : world.x - preset.config.width / 2
-        const centeredY = snapEnabled
-          ? snapToGrid(world.y - preset.config.height / 2)
-          : world.y - preset.config.height / 2
-
-        addObjectFromPreset(preset, centeredX, centeredY)
-        return
-      }
-
-      if (data.source === 'canvas') {
-        if (editorMode !== 'edit') return
-
-        moveObjectByDelta(
-          data.objectId,
-          snapEnabled ? snapToGrid(delta.x / canvasZoom) : delta.x / canvasZoom,
-          snapEnabled ? snapToGrid(delta.y / canvasZoom) : delta.y / canvasZoom,
-        )
-      }
-    },
+  const onDragEnd = useMemo(
+    () =>
+      createOnDragEnd({
+        editorMode,
+        role,
+        canvasPosition,
+        canvasZoom,
+        snapEnabled,
+        addObjectFromPreset,
+        moveObjectByDelta,
+      }),
     [editorMode, role, canvasPosition, canvasZoom, snapEnabled, addObjectFromPreset, moveObjectByDelta],
   )
 
