@@ -50,6 +50,25 @@ export const mapOpeningHours = (entries) => {
   })
 }
 
+export const mapOpeningDateOverrides = (entries) => {
+  if (!Array.isArray(entries)) return []
+
+  return entries
+    .map((entry) => {
+      const date = String(entry.serviceDate ?? '').trim()
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null
+
+      return {
+        date,
+        open: String(entry.openTime ?? '09:00').slice(0, 5),
+        close: String(entry.closeTime ?? '22:00').slice(0, 5),
+        isClosed: Boolean(entry.closed),
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.date.localeCompare(b.date))
+}
+
 const normalizeLegacyObjectType = (type, width, height, metadata) => {
   const raw = String(type ?? '')
   const upper = raw.toUpperCase()
@@ -195,7 +214,15 @@ export const mapFloor = (floor, objects) => ({
   },
 })
 
-export const mapRestaurant = (restaurant, floors, workers, openingHours, menuFolders, menuItems) => ({
+export const mapRestaurant = (
+  restaurant,
+  floors,
+  workers,
+  openingHours,
+  openingDateOverrides,
+  menuFolders,
+  menuItems,
+) => ({
   id: restaurant.id,
   name: restaurant.name,
   floors,
@@ -207,6 +234,7 @@ export const mapRestaurant = (restaurant, floors, workers, openingHours, menuFol
     role: workerRoleToFrontend(worker.role),
   })),
   openingHours: mapOpeningHours(openingHours),
+  openingDateOverrides: mapOpeningDateOverrides(openingDateOverrides),
   createdAt: toDateMs(restaurant.createdAt),
   updatedAt: toDateMs(restaurant.updatedAt),
 })

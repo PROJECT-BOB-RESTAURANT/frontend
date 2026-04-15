@@ -35,6 +35,7 @@ export const createRestaurantModel = (name) => ({
   goodsCatalog: createDefaultMenuFolders(),
   workers: [],
   openingHours: createDefaultOpeningHours(),
+  openingDateOverrides: [],
   createdAt: Date.now(),
   updatedAt: Date.now(),
 })

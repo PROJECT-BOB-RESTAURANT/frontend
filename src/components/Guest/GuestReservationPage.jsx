@@ -3,6 +3,8 @@ import { useFloorStore } from '../../store/useFloorStore'
 import { isTableObjectType } from '../../utils/objectLibrary'
 import { backendApi } from '../../services/backendApi'
 
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
 const toDateTimeLocal = (date) => {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -10,6 +12,39 @@ const toDateTimeLocal = (date) => {
   const hour = String(date.getHours()).padStart(2, '0')
   const minute = String(date.getMinutes()).padStart(2, '0')
   return `${year}-${month}-${day}T${hour}:${minute}`
+}
+
+const toMinutes = (timeValue) => {
+  const text = String(timeValue ?? '').trim()
+  const match = text.match(/^(\d{2}):(\d{2})$/)
+  if (!match) return null
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null
+  return hour * 60 + minute
+}
+
+const toDateKey = (value) => {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  const year = parsed.getFullYear()
+  const month = String(parsed.getMonth() + 1).padStart(2, '0')
+  const day = String(parsed.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const getEffectiveOpeningForDate = (dateKey, weeklyEntries, overrideEntries) => {
+  const weekly = Array.isArray(weeklyEntries) ? weeklyEntries : []
+  const overrides = Array.isArray(overrideEntries) ? overrideEntries : []
+
+  const override = overrides.find((entry) => entry.date === dateKey) ?? null
+  if (override) return override
+
+  const parsed = new Date(`${dateKey}T00:00`)
+  if (Number.isNaN(parsed.getTime())) return null
+  const dayName = DAY_NAMES[parsed.getDay()]
+  return weekly.find((entry) => entry.day === dayName) ?? null
 }
 
 export const GuestReservationPage = () => {
@@ -73,6 +108,51 @@ export const GuestReservationPage = () => {
   const submitReservation = () => {
     if (!restaurantId || !floorId || !tableId) {
       setFeedback('Please select restaurant, floor, and table.')
+      return
+    }
+
+    const startDateKey = toDateKey(startAt)
+    const endDateKey = toDateKey(endAt)
+    if (!startDateKey || !endDateKey) {
+      setFeedback('Please provide valid reservation start and end values.')
+      return
+    }
+
+    if (startDateKey !== endDateKey) {
+      setFeedback('Reservation must start and end on the same day.')
+      return
+    }
+
+    const startMinutes = toMinutes(String(startAt).slice(11, 16))
+    const endMinutes = toMinutes(String(endAt).slice(11, 16))
+    if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
+      setFeedback('Reservation end time must be after start time.')
+      return
+    }
+
+    const effectiveOpening = getEffectiveOpeningForDate(
+      startDateKey,
+      selectedRestaurant?.openingHours,
+      selectedRestaurant?.openingDateOverrides,
+    )
+
+    if (!effectiveOpening || effectiveOpening.isClosed) {
+      setFeedback('Restaurant is closed for the selected reservation date.')
+      return
+    }
+
+    const openMinutes = toMinutes(effectiveOpening.open)
+    const closeMinutes = toMinutes(effectiveOpening.close)
+    if (
+      openMinutes === null
+      || closeMinutes === null
+      || closeMinutes <= openMinutes
+      || startMinutes < openMinutes
+      || endMinutes > closeMinutes
+    ) {
+      setFeedback(
+        `Reservation must be within opening hours: ${effectiveOpening.open} - ${effectiveOpening.close}.`,
+      )
       return
     }
 

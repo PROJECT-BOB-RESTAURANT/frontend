@@ -16,6 +16,7 @@ import {
   DEFAULT_RESERVATION_HOURS,
   findFolderById,
   normalizeMenuFolders,
+  normalizeOpeningDateOverrides,
   normalizeObject,
   normalizeOpeningHours,
   normalizeOrders,
@@ -1260,6 +1261,7 @@ export const createFloorStoreActions = (set, get) => ({
           floors,
           workers: normalizeWorkers(restaurant.workers),
           openingHours: normalizeOpeningHours(restaurant.openingHours),
+          openingDateOverrides: normalizeOpeningDateOverrides(restaurant.openingDateOverrides),
           goodsCatalog: normalizeMenuFolders(restaurant.goodsCatalog ?? restaurant.goodsCategories),
           updatedAt: restaurant.updatedAt ?? Date.now(),
           createdAt: restaurant.createdAt ?? Date.now(),
@@ -1382,6 +1384,7 @@ export const createFloorStoreActions = (set, get) => ({
               workers: normalizeWorkers(restaurant.workers),
               goodsCatalog: normalizeMenuFolders(restaurant.goodsCatalog ?? restaurant.goodsCategories),
               openingHours: normalizeOpeningHours(restaurant.openingHours),
+              openingDateOverrides: normalizeOpeningDateOverrides(restaurant.openingDateOverrides),
             }
           : null,
         floors: persistedFloors.map((floor) => ({
@@ -1471,6 +1474,9 @@ export const createFloorStoreActions = (set, get) => ({
           ),
           openingHours: normalizeOpeningHours(
             parsed.restaurant?.openingHours ?? restaurant.openingHours,
+          ),
+          openingDateOverrides: normalizeOpeningDateOverrides(
+            parsed.restaurant?.openingDateOverrides ?? restaurant.openingDateOverrides,
           ),
         }
       },

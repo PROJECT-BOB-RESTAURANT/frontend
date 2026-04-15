@@ -91,6 +91,7 @@ export const WaiterPanel = () => {
   const [isSaving, setIsSaving] = useState(false)
   const [feedback, setFeedback] = useState('')
   const [savedOpeningHours, setSavedOpeningHours] = useState([])
+  const [savedOpeningDateOverrides, setSavedOpeningDateOverrides] = useState([])
 
   const orders = table?.metadata?.orders ?? []
   const reservations = (table?.metadata?.reservations ?? []).slice().sort((a, b) => {
@@ -196,6 +197,20 @@ export const WaiterPanel = () => {
     if (Number.isNaN(parsed.getTime())) return null
 
     const dayName = DAY_NAMES[parsed.getDay()]
+    const dateKey = timelineDate
+    const openingDateOverrides = savedOpeningDateOverrides.length > 0
+      ? savedOpeningDateOverrides
+      : (currentRestaurant?.openingDateOverrides ?? [])
+    const overrideEntry = openingDateOverrides.find((item) => item.date === dateKey) ?? null
+
+    if (overrideEntry) {
+      return {
+        dayName,
+        entry: overrideEntry,
+        isOverride: true,
+      }
+    }
+
     const openingHours = savedOpeningHours.length > 0
       ? savedOpeningHours
       : (currentRestaurant?.openingHours ?? [])
@@ -204,8 +219,15 @@ export const WaiterPanel = () => {
     return {
       dayName,
       entry,
+      isOverride: false,
     }
-  }, [timelineDate, currentRestaurant?.openingHours, savedOpeningHours])
+  }, [
+    timelineDate,
+    currentRestaurant?.openingDateOverrides,
+    currentRestaurant?.openingHours,
+    savedOpeningDateOverrides,
+    savedOpeningHours,
+  ])
 
   const timelineClosedBlocks = useMemo(() => {
     const entry = selectedDayOpening?.entry
@@ -242,10 +264,11 @@ export const WaiterPanel = () => {
   const selectedDayHoursText = useMemo(() => {
     const dayName = selectedDayOpening?.dayName ?? 'Selected day'
     const entry = selectedDayOpening?.entry
+    const isOverride = Boolean(selectedDayOpening?.isOverride)
 
     if (!entry) return `${dayName}: not configured (treated as closed)`
-    if (entry.isClosed) return `${dayName}: closed (occupied)`
-    return `${dayName}: open ${entry.open} - ${entry.close}`
+    if (entry.isClosed) return `${dayName}: closed${isOverride ? ' (special date)' : ' (occupied)'}`
+    return `${dayName}: open ${entry.open} - ${entry.close}${isOverride ? ' (special date)' : ''}`
   }, [selectedDayOpening])
 
   const isSelectedDayClosed = useMemo(() => {
@@ -274,20 +297,25 @@ export const WaiterPanel = () => {
   useEffect(() => {
     if (!currentRestaurantId) {
       setSavedOpeningHours([])
+      setSavedOpeningDateOverrides([])
       return
     }
 
     let active = true
 
-    backendApi
-      .getOpeningHours(currentRestaurantId)
-      .then((hours) => {
+    Promise.all([
+      backendApi.getOpeningHours(currentRestaurantId),
+      backendApi.getOpeningHourOverrides(currentRestaurantId),
+    ])
+      .then(([hours, overrides]) => {
         if (!active) return
         setSavedOpeningHours(Array.isArray(hours) ? hours : [])
+        setSavedOpeningDateOverrides(Array.isArray(overrides) ? overrides : [])
       })
       .catch(() => {
         if (!active) return
         setSavedOpeningHours([])
+        setSavedOpeningDateOverrides([])
       })
 
     return () => {
