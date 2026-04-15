@@ -135,12 +135,15 @@ export const RestaurantGoodsManager = () => {
             type="button"
             className="mt-3 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={isSaving}
-            onClick={() =>
+            onClick={() => {
+              const shouldSave = window.confirm('Do you want to save opening hours?')
+              if (!shouldSave) return
+
               runMutation(
                 () => backendApi.upsertWeeklyOpeningHours(currentRestaurantId, openingHours),
                 'Opening hours saved.',
               )
-            }
+            }}
           >
             {isSaving ? 'Saving...' : 'Save Opening Hours'}
           </button>

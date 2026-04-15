@@ -37,13 +37,8 @@ function AppContent({ role }) {
         role={role}
         restaurants={controller.restaurants}
         isBackendLoading={controller.isBackendLoading}
-        onOpenGuestReservationPage={controller.openGuestReservationPage}
-        onOpenKitchenMenu={controller.openKitchenForRestaurant}
-        onOpenReservationStatistics={controller.openReservationStatisticsForRestaurant}
         onCreateRestaurant={controller.createRestaurant}
         onOpenRestaurant={controller.openRestaurant}
-        onRenameRestaurant={controller.renameRestaurant}
-        onDeleteRestaurant={controller.deleteRestaurant}
       />
     )
   }
@@ -77,6 +72,11 @@ function AppContent({ role }) {
         onRenameFloor={controller.renameFloor}
         onDeleteFloor={controller.deleteFloor}
         onOpenWorkers={() => setManagementView('workers')}
+        onRenameRestaurant={controller.renameRestaurant}
+        onDeleteRestaurant={controller.deleteRestaurant}
+        onOpenKitchenMenu={controller.openKitchenForRestaurant}
+        onOpenReservationStatistics={controller.openReservationStatisticsForRestaurant}
+        onOpenGuestReservationPage={controller.openGuestReservationPage}
         goodsManager={!isStaff ? <RestaurantGoodsManager /> : null}
       />
     )

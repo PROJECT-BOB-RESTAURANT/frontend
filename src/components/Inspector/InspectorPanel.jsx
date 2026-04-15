@@ -54,13 +54,22 @@ export const InspectorPanel = ({ role }) => {
                 <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Table Actions</h3>
                   <p className="text-sm font-semibold text-slate-800">{selectedObject.metadata?.label ?? 'Selected table'}</p>
-                  <button
-                    type="button"
-                    className="min-h-11 w-full rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500"
-                    onClick={() => openWaiterForTable(selectedObject.id)}
-                  >
-                    Manage Table
-                  </button>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      className="min-h-11 w-full rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500"
+                      onClick={() => openWaiterForTable(selectedObject.id, 'orders')}
+                    >
+                      Manage Table
+                    </button>
+                    <button
+                      type="button"
+                      className="min-h-11 w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+                      onClick={() => openWaiterForTable(selectedObject.id, 'reservations')}
+                    >
+                      Manage Reservation
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
@@ -206,13 +215,22 @@ export const InspectorPanel = ({ role }) => {
             </button>
 
             {!canEdit && isTable ? (
-              <button
-                type="button"
-                className="min-h-11 w-full rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500"
-                onClick={() => openWaiterForTable(selectedObject.id)}
-              >
-                Manage Table
-              </button>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  className="min-h-11 w-full rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500"
+                  onClick={() => openWaiterForTable(selectedObject.id, 'orders')}
+                >
+                  Manage Table
+                </button>
+                <button
+                  type="button"
+                  className="min-h-11 w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+                  onClick={() => openWaiterForTable(selectedObject.id, 'reservations')}
+                >
+                  Manage Reservation
+                </button>
+              </div>
             ) : null}
             </>
           )

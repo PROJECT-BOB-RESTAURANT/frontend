@@ -4,13 +4,8 @@ function RestaurantManagementPage({
   role,
   restaurants,
   isBackendLoading,
-  onOpenGuestReservationPage,
-  onOpenKitchenMenu,
-  onOpenReservationStatistics,
   onCreateRestaurant,
   onOpenRestaurant,
-  onRenameRestaurant,
-  onDeleteRestaurant,
 }) {
   const isStaff = role === 'STAFF'
 
@@ -20,17 +15,10 @@ function RestaurantManagementPage({
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-extrabold text-slate-800">Restaurants</h1>
-            <p className="text-sm text-slate-500">Create, view, and manage restaurant locations.</p>
+            <p className="text-sm text-slate-500">Choose a restaurant and continue through one focused management menu.</p>
           </div>
           {!isStaff ? (
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
-                onClick={onOpenGuestReservationPage}
-              >
-                Guest Reservation Page
-              </button>
               <button
                 type="button"
                 className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
@@ -62,52 +50,14 @@ function RestaurantManagementPage({
                 Updated: {new Date(restaurant.updatedAt).toLocaleString()}
               </p>
 
-              <div className={`mt-3 grid gap-2 ${isStaff ? 'grid-cols-2' : 'grid-cols-4'}`}>
+              <div className="mt-3 grid gap-2 grid-cols-1">
                 <button
                   type="button"
                   className="rounded-md bg-sky-600 px-2 py-1 text-xs font-semibold text-white hover:bg-sky-500"
                   onClick={() => onOpenRestaurant(restaurant.id)}
                 >
-                  Open Floors
+                  Manage Restaurant
                 </button>
-                {typeof onOpenReservationStatistics === 'function' ? (
-                  <button
-                    type="button"
-                    className="rounded-md bg-indigo-600 px-2 py-1 text-xs font-semibold text-white hover:bg-indigo-500"
-                    onClick={() => onOpenReservationStatistics(restaurant.id)}
-                  >
-                    Reservation Stats
-                  </button>
-                ) : null}
-                {typeof onOpenKitchenMenu === 'function' ? (
-                  <button
-                    type="button"
-                    className="rounded-md bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
-                    onClick={() => onOpenKitchenMenu(restaurant.id)}
-                  >
-                    Open Kitchen
-                  </button>
-                ) : null}
-                {!isStaff ? (
-                  <button
-                    type="button"
-                    className="rounded-md bg-amber-500 px-2 py-1 text-xs font-semibold text-white hover:bg-amber-400"
-                    onClick={() => onRenameRestaurant(restaurant)}
-                    disabled={isBackendLoading}
-                  >
-                    Rename
-                  </button>
-                ) : null}
-                {!isStaff ? (
-                  <button
-                    type="button"
-                    className="rounded-md bg-rose-600 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-500"
-                    onClick={() => onDeleteRestaurant(restaurant.id)}
-                    disabled={isBackendLoading}
-                  >
-                    Delete
-                  </button>
-                ) : null}
               </div>
             </article>
           ))}

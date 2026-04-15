@@ -74,12 +74,14 @@ export const WaiterPanel = () => {
   const setTableManualOccupied = useFloorStore((state) => state.setTableManualOccupied)
   const extendTableManualOccupied = useFloorStore((state) => state.extendTableManualOccupied)
   const clearTableManualOccupied = useFloorStore((state) => state.clearTableManualOccupied)
+  const waiterActiveSection = useFloorStore((state) => state.waiterActiveSection)
+  const setWaiterActiveSection = useFloorStore((state) => state.setWaiterActiveSection)
 
   const [customItemName, setCustomItemName] = useState('')
   const [customNote, setCustomNote] = useState('')
   const [customPrice, setCustomPrice] = useState('')
   const [menuPath, setMenuPath] = useState([])
-  const [activeSection, setActiveSection] = useState('orders')
+  const activeSection = waiterActiveSection === 'reservations' ? 'reservations' : 'orders'
   const [reservationGuestName, setReservationGuestName] = useState('')
   const [reservationPartySize, setReservationPartySize] = useState('2')
   const [reservationStart, setReservationStart] = useState(nowLocalDateTime)
@@ -438,7 +440,9 @@ export const WaiterPanel = () => {
           <button
             type="button"
             className="ml-auto rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500"
-            onClick={() => setActiveSection(activeSection === 'orders' ? 'reservations' : 'orders')}
+            onClick={() =>
+              setWaiterActiveSection(activeSection === 'orders' ? 'reservations' : 'orders')
+            }
           >
             {activeSection === 'orders' ? 'Open Reservations Menu' : 'Back To Orders Menu'}
           </button>

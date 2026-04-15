@@ -191,6 +191,9 @@ function useAppController(role) {
 
   const deleteRestaurant = useCallback(
     async (restaurantId) => {
+      const shouldDelete = window.confirm('Do you really want to delete this restaurant?')
+      if (!shouldDelete) return
+
       await withLoading(async () => {
         await backendApi.deleteRestaurant(restaurantId)
         await reloadFromBackend('Restaurant deleted.')
@@ -248,6 +251,9 @@ function useAppController(role) {
 
   const onSaveCurrentFloorLayout = useCallback(async () => {
     if (!currentRestaurantId || !currentFloor) return
+
+    const shouldSave = window.confirm('Do you want to save the floor layout?')
+    if (!shouldSave) return
 
     const floorToSave = {
       ...currentFloor,

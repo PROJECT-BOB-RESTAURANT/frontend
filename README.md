@@ -9,6 +9,8 @@ The current build is frontend-first (Zustand in-memory state), structured so bac
 Current capabilities:
 - Default login page with account sign-in.
 - Admin-only pre-page with entry options for user management and restaurant management.
+- Simplified restaurant list cards with a single `Manage Restaurant` action.
+- Sectioned restaurant management hub with dedicated `Restaurant Management`, `Floor Manager`, and `Staff Manager` areas.
 - Fixed user status widget (bottom-left) showing current username and role, with hide and logout actions.
 - Dedicated workers management page where restaurant workers are assigned from searchable system users.
 - Multi-restaurant management with isolated data contexts.
@@ -83,7 +85,7 @@ Use the app to set up a restaurant for service:
 ## 3.2 Operations Workflow
 
 Use waiter mode for in-service table operations:
-1. Open table in waiter manager.
+1. Open table in waiter manager from `Manage Table` or jump directly to reservations from `Manage Reservation`.
 2. Add catalog or custom order items.
 3. Set worker attribution.
 4. Add reservations or manual occupancy.
@@ -136,6 +138,15 @@ Key files:
 - `src/hooks/useAppController.js`: application orchestration for backend loading, CRUD flows, and editor drag/drop handlers.
 - `src/pages/*.jsx`: route-level page components for restaurant management, floor management, and editor screens.
 - `src/store/useFloorStore.js`: navigation actions and all domain state.
+
+Management hub behavior:
+- Restaurant list is intentionally minimal and only opens selected restaurant management.
+- Restaurant-specific actions are grouped on the management screen:
+	- `Management Menu`: split into `Restaurant Manager Buttons` and `Staff Managing Buttons`.
+	- `Restaurant Manager Buttons`: kitchen, reservation stats, guest page, rename/delete restaurant.
+	- `Admin Buttons`: restaurant rename/delete actions.
+	- `Floor Manager`: floor list and floor CRUD/editor actions, menu/opening-hours management tools.
+	- `Staff Managing Buttons`: worker management page entry.
 
 ## 4.2 State and Domain Model
 
@@ -219,19 +230,30 @@ Admin-only pre-page:
 
 From restaurants view:
 - Add restaurant
-- Rename restaurant
-- Delete restaurant
-- Open management/floors
+- Open selected restaurant via `Manage Restaurant`
+
+From restaurant management hub (`Restaurant Management` section):
+- Open kitchen
 - Open reservation statistics
-- Open kitchen (staff)
 - Open guest reservation page
 
-From restaurant management panel:
-- Open dedicated workers page
+From restaurant management hub (`Admin Buttons` section):
+- Rename restaurant
+- Delete restaurant
+
+From restaurant management hub (`Floor Manager` section):
+- Add floor
+- Rename floor
+- Delete floor
+- Open floor in view mode
+- Open floor in edit mode
 - Manage opening hours per day
 - Mark day as closed
 - Manage nested menu folders
 - Manage menu items with pricing
+
+From restaurant management hub (`Staff Manager` section):
+- Open dedicated workers page
 
 From workers page:
 - Search users by username
@@ -243,10 +265,9 @@ From workers page:
 ## 5.2 Floor and Editor Options
 
 From floor management:
-- Add floor
-- Rename floor
-- Delete floor
-- Open editor
+- Open floor in view mode
+- Open floor in edit mode
+- For manager/admin: add floor, rename floor, delete floor
 
 From editor:
 - Switch edit/view mode
@@ -257,13 +278,19 @@ From editor:
 - Toggle snapping
 - Export and import floor data (admin only)
 
+Confirmation dialogs:
+- Delete restaurant requires explicit confirmation.
+- Save Floor Layout requires explicit confirmation.
+- Save Opening Hours requires explicit confirmation.
+
 Floor planner UX behavior:
 - Touch-friendly controls with larger tap targets in the top toolbar and side panels
 - Canvas panning supports touch/pen drag for tablet navigation
 - Floor planner toolbar includes a `Time` selector to preview table free/reserved colors at any chosen datetime
 - Floor planner `Time` includes `-` and `+` step buttons (30 minutes) for quick backward/forward availability preview
+- Floor viewer toolbar includes a `Restore View` button to instantly return canvas zoom and position to centered defaults
 - JSON layout tools are visible only for admin users
-- Staff users in planner view only get table service action access (no object data editing panels)
+- Staff users in planner view only get table service actions (no object data editing panels), including `Manage Table` and `Manage Reservation` when selecting a table
 - Manager and admin can place new library elements in both edit mode and table/view mode
 - Planner side panels use larger widths/heights for easier touch navigation
 
