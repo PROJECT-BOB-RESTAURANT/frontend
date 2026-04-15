@@ -160,7 +160,7 @@ Management hub behavior:
 State is centralized in Zustand (`src/store/useFloorStore.js`).
 
 Top-level entities:
-- `restaurant`: contains floors, workers, opening hours, menu tree.
+- `restaurant`: contains floors, workers, weekly opening hours, date-specific opening-hour overrides, menu tree.
 - `floor`: contains canvas parameters and floor objects.
 - `floor object`: geometry + metadata; table objects hold seats/orders/reservations.
 - `worker`: name + role for assignment and attribution.
@@ -255,6 +255,7 @@ From restaurant management hub (`Floor Manager` section):
 - Open floor in view mode
 - Open floor in edit mode
 - Manage opening hours per day
+- Manage date-specific opening-hour overrides (special closed/extended days)
 - Mark day as closed
 - Manage nested menu folders
 - Manage menu items with pricing
@@ -289,6 +290,10 @@ Confirmation dialogs:
 - Delete restaurant requires explicit confirmation.
 - Save Floor Layout requires explicit confirmation.
 - Save Opening Hours requires explicit confirmation.
+
+Opening-hours behavior:
+- Weekly opening hours define the default schedule.
+- Date-specific overrides take precedence over the weekly schedule in service/timeline views.
 
 Floor planner UX behavior:
 - Touch-friendly controls with larger tap targets in the top toolbar and side panels

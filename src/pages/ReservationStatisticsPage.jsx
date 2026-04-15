@@ -14,6 +14,12 @@ const toDateInputValue = (date) => {
   return `${year}-${month}-${day}`
 }
 
+const toDateKeyFromValue = (value) => {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  return toDateInputValue(parsed)
+}
+
 const toDateTimeLocal = (value) => {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
@@ -49,6 +55,27 @@ const toMinutes = (timeValue) => {
   return hour * 60 + minute
 }
 
+const getEffectiveOpeningForDate = (dateKey, weeklyEntries, overrideEntries) => {
+  const weekly = Array.isArray(weeklyEntries) ? weeklyEntries : []
+  const overrides = Array.isArray(overrideEntries) ? overrideEntries : []
+
+  const override = overrides.find((entry) => entry.date === dateKey) ?? null
+  if (override) {
+    return { entry: override, isOverride: true }
+  }
+
+  const parsed = new Date(`${dateKey}T00:00`)
+  if (Number.isNaN(parsed.getTime())) {
+    return { entry: null, isOverride: false }
+  }
+
+  const dayName = DAY_NAMES[parsed.getDay()]
+  return {
+    entry: weekly.find((entry) => entry.day === dayName) ?? null,
+    isOverride: false,
+  }
+}
+
 const fallbackTableLabel = (table) => {
   const candidate = String(table?.metadata?.label ?? '').trim()
   if (candidate) return candidate
@@ -76,6 +103,7 @@ function ReservationStatisticsPage({
   const [isLoading, setIsLoading] = useState(false)
   const [feedback, setFeedback] = useState('')
   const [savedOpeningHours, setSavedOpeningHours] = useState([])
+  const [savedOpeningDateOverrides, setSavedOpeningDateOverrides] = useState([])
   const [activeTableId, setActiveTableId] = useState(null)
   const [activeFloorId, setActiveFloorId] = useState(null)
   const [guestName, setGuestName] = useState('')
@@ -106,7 +134,14 @@ function ReservationStatisticsPage({
   const openingSource = savedOpeningHours.length > 0
     ? savedOpeningHours
     : (currentRestaurant?.openingHours ?? [])
-  const openingEntry = openingSource.find((entry) => entry.day === dayName) ?? null
+  const openingOverrideSource = savedOpeningDateOverrides.length > 0
+    ? savedOpeningDateOverrides
+    : (currentRestaurant?.openingDateOverrides ?? [])
+  const effectiveOpening = useMemo(
+    () => getEffectiveOpeningForDate(timelineDate, openingSource, openingOverrideSource),
+    [timelineDate, openingSource, openingOverrideSource],
+  )
+  const openingEntry = effectiveOpening.entry
 
   const closedBlocks = useMemo(() => {
     if (!openingEntry) return [{ leftPct: 0, widthPct: 100 }]
@@ -136,9 +171,9 @@ function ReservationStatisticsPage({
 
   const openingHoursLabel = useMemo(() => {
     if (!openingEntry) return `${dayName}: not configured (closed)`
-    if (openingEntry.isClosed) return `${dayName}: closed`
-    return `${dayName}: ${openingEntry.open} - ${openingEntry.close}`
-  }, [dayName, openingEntry])
+    if (openingEntry.isClosed) return `${dayName}: closed${effectiveOpening.isOverride ? ' (special date)' : ''}`
+    return `${dayName}: ${openingEntry.open} - ${openingEntry.close}${effectiveOpening.isOverride ? ' (special date)' : ''}`
+  }, [dayName, effectiveOpening.isOverride, openingEntry])
 
   const floorsWithTables = useMemo(() => {
     const floors = currentRestaurant?.floors ?? []
@@ -194,20 +229,25 @@ function ReservationStatisticsPage({
   useEffect(() => {
     if (!currentRestaurantId) {
       setSavedOpeningHours([])
+      setSavedOpeningDateOverrides([])
       return
     }
 
     let active = true
 
-    backendApi
-      .getOpeningHours(currentRestaurantId)
-      .then((hours) => {
+    Promise.all([
+      backendApi.getOpeningHours(currentRestaurantId),
+      backendApi.getOpeningHourOverrides(currentRestaurantId),
+    ])
+      .then(([hours, overrides]) => {
         if (!active) return
         setSavedOpeningHours(Array.isArray(hours) ? hours : [])
+        setSavedOpeningDateOverrides(Array.isArray(overrides) ? overrides : [])
       })
       .catch(() => {
         if (!active) return
         setSavedOpeningHours([])
+        setSavedOpeningDateOverrides([])
       })
 
     return () => {
@@ -360,6 +400,48 @@ function ReservationStatisticsPage({
 
     if (!guestName.trim()) {
       setFeedback('Guest name is required.')
+      return
+    }
+
+    const startDateKey = toDateKeyFromValue(reservationStart)
+    const endDateKey = toDateKeyFromValue(reservationEnd)
+
+    if (!startDateKey || !endDateKey) {
+      setFeedback('Reservation start and end must be valid datetime values.')
+      return
+    }
+
+    if (startDateKey !== endDateKey) {
+      setFeedback('Reservation must start and end on the same day.')
+      return
+    }
+
+    const startMinutes = toMinutes(String(reservationStart).slice(11, 16))
+    const endMinutes = toMinutes(String(reservationEnd).slice(11, 16))
+    if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
+      setFeedback('Reservation end time must be after start time.')
+      return
+    }
+
+    const effective = getEffectiveOpeningForDate(startDateKey, openingSource, openingOverrideSource)
+    const effectiveEntry = effective.entry
+
+    if (!effectiveEntry || effectiveEntry.isClosed) {
+      setFeedback('Restaurant is closed for the selected reservation date.')
+      return
+    }
+
+    const openMinutes = toMinutes(effectiveEntry.open)
+    const closeMinutes = toMinutes(effectiveEntry.close)
+
+    if (
+      openMinutes === null
+      || closeMinutes === null
+      || closeMinutes <= openMinutes
+      || startMinutes < openMinutes
+      || endMinutes > closeMinutes
+    ) {
+      setFeedback(`Reservation must be within opening hours: ${effectiveEntry.open} - ${effectiveEntry.close}.`)
       return
     }
 

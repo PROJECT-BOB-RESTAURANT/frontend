@@ -8,8 +8,27 @@ const getTodayName = () => {
   return names[new Date().getDay()]
 }
 
+const getTodayDateKey = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 const formatTodayOpeningHours = (restaurant) => {
+  const todayDate = getTodayDateKey()
+  const overrides = Array.isArray(restaurant?.openingDateOverrides)
+    ? restaurant.openingDateOverrides
+    : []
+  const override = overrides.find((item) => item.date === todayDate)
+
   const today = getTodayName()
+  if (override) {
+    if (override.isClosed) return `${today}: closed (special date)`
+    return `${today}: ${override.open} - ${override.close} (special date)`
+  }
+
   const hours = restaurant?.openingHours ?? []
   const entry = hours.find((item) => item.day === today)
   if (!entry) return `${today}: not set`

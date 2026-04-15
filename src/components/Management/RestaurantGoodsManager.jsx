@@ -33,10 +33,15 @@ export const RestaurantGoodsManager = () => {
   const [newFolderName, setNewFolderName] = useState('')
   const [newItemName, setNewItemName] = useState('')
   const [newItemPrice, setNewItemPrice] = useState('')
+  const [overrideDate, setOverrideDate] = useState('')
+  const [overrideOpen, setOverrideOpen] = useState('09:00')
+  const [overrideClose, setOverrideClose] = useState('22:00')
+  const [overrideClosed, setOverrideClosed] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [feedback, setFeedback] = useState('')
 
   const openingHours = currentRestaurant?.openingHours ?? []
+  const openingDateOverrides = currentRestaurant?.openingDateOverrides ?? []
   const rootFolders = currentRestaurant?.goodsCatalog ?? currentRestaurant?.goodsCategories ?? []
   const activeFolder = useMemo(
     () => findFolderByPath(rootFolders, folderPath),
@@ -96,7 +101,7 @@ export const RestaurantGoodsManager = () => {
             {openingHours.map((entry) => (
               <div
                 key={entry.day}
-                className="grid grid-cols-[110px_1fr_1fr_auto] items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-2"
+                className="grid grid-cols-1 gap-2 rounded-md border border-slate-200 bg-slate-50 p-2 sm:grid-cols-[110px_1fr_1fr_auto] sm:items-center"
               >
                 <span className="text-xs font-semibold text-slate-700">{entry.day}</span>
                 <input
@@ -147,6 +152,108 @@ export const RestaurantGoodsManager = () => {
           >
             {isSaving ? 'Saving...' : 'Save Opening Hours'}
           </button>
+
+          <div className="mt-4 border-t border-slate-200 pt-4">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+              Date-Specific Overrides
+            </h4>
+            <p className="mt-1 text-xs text-slate-500">
+              Use this for holidays, one-off closures, or extended service days.
+            </p>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <input
+                className="min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                type="date"
+                value={overrideDate}
+                onChange={(event) => setOverrideDate(event.target.value)}
+              />
+              <input
+                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                type="time"
+                value={overrideOpen}
+                disabled={overrideClosed}
+                onChange={(event) => setOverrideOpen(event.target.value)}
+              />
+              <input
+                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                type="time"
+                value={overrideClose}
+                disabled={overrideClosed}
+                onChange={(event) => setOverrideClose(event.target.value)}
+              />
+              <label className="shrink-0 whitespace-nowrap px-1 text-[11px] font-semibold text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={overrideClosed}
+                  onChange={(event) => setOverrideClosed(event.target.checked)}
+                />
+                Closed
+              </label>
+              <button
+                type="button"
+                className="w-full rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                disabled={isSaving || !overrideDate}
+                onClick={() => {
+                  if (!overrideDate) return
+
+                  runMutation(
+                    () =>
+                      backendApi.upsertOpeningHourOverride(currentRestaurantId, overrideDate, {
+                        open: overrideOpen,
+                        close: overrideClose,
+                        isClosed: overrideClosed,
+                      }),
+                    `Override saved for ${overrideDate}.`,
+                  )
+                }}
+              >
+                Save Date Rule
+              </button>
+            </div>
+
+            <div className="mt-3 space-y-2">
+              {openingDateOverrides.map((entry) => (
+                <div
+                  key={entry.date}
+                  className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-2"
+                >
+                  <button
+                    type="button"
+                    className="rounded-md bg-slate-900 px-2 py-1 text-[11px] font-semibold text-white hover:bg-slate-700"
+                    onClick={() => {
+                      setOverrideDate(entry.date)
+                      setOverrideOpen(entry.open)
+                      setOverrideClose(entry.close)
+                      setOverrideClosed(entry.isClosed)
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <span className="text-xs font-semibold text-slate-700">{entry.date}</span>
+                  <span className="min-w-0 flex-1 break-words text-xs text-slate-600">
+                    {entry.isClosed ? 'Closed' : `${entry.open} - ${entry.close}`}
+                  </span>
+                  <button
+                    type="button"
+                    className="rounded-md bg-rose-100 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-200 sm:ml-auto"
+                    onClick={() =>
+                      runMutation(
+                        () => backendApi.deleteOpeningHourOverride(currentRestaurantId, entry.date),
+                        `Override removed for ${entry.date}.`,
+                      )
+                    }
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
+
+              {openingDateOverrides.length === 0 ? (
+                <p className="text-xs text-slate-500">No date overrides configured yet.</p>
+              ) : null}
+            </div>
+          </div>
         </article>
 
         <article className="rounded-xl border border-slate-200 bg-white p-4">
@@ -167,9 +274,9 @@ export const RestaurantGoodsManager = () => {
             Location: {activeFolder ? activeFolder.name : 'Root'}
           </p>
 
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
             <input
-              className="flex-1 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+              className="min-w-0 flex-1 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
               type="text"
               placeholder="New folder name"
               value={newFolderName}
@@ -200,7 +307,7 @@ export const RestaurantGoodsManager = () => {
             {visibleFolders.map((folder) => (
               <div
                 key={folder.id}
-                className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-2"
+                className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-2"
               >
                 <button
                   type="button"
@@ -209,10 +316,12 @@ export const RestaurantGoodsManager = () => {
                 >
                   Open
                 </button>
-                <span className="text-sm font-medium text-slate-700">{folder.name}</span>
+                <span className="min-w-0 flex-1 break-words text-sm font-medium text-slate-700">
+                  {folder.name}
+                </span>
                 <button
                   type="button"
-                  className="ml-auto rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200"
+                  className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 sm:ml-auto"
                   onClick={() => {
                     const next = window.prompt('Rename folder', folder.name)
                     if (!next) return
@@ -257,7 +366,7 @@ export const RestaurantGoodsManager = () => {
                 {visibleItems.map((item) => (
                   <div
                     key={item.id}
-                    className="grid grid-cols-[1fr_120px_auto] items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-2"
+                    className="grid grid-cols-1 gap-2 rounded-md border border-slate-200 bg-slate-50 p-2 sm:grid-cols-[1fr_120px_auto] sm:items-center"
                   >
                     <input
                       className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
@@ -306,7 +415,7 @@ export const RestaurantGoodsManager = () => {
                 ))}
               </div>
 
-              <div className="mt-3 grid grid-cols-[1fr_120px_auto] gap-2">
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_120px_auto]">
                 <input
                   className="rounded-md border border-slate-200 px-2 py-1 text-xs"
                   type="text"

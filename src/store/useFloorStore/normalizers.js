@@ -46,6 +46,25 @@ export const normalizeOpeningHours = (hours) => {
   })
 }
 
+export const normalizeOpeningDateOverrides = (overrides) => {
+  if (!Array.isArray(overrides)) return []
+
+  return overrides
+    .map((entry) => {
+      const date = String(entry?.date ?? '').trim()
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null
+
+      return {
+        date,
+        open: normalizeTime(entry?.open, '09:00'),
+        close: normalizeTime(entry?.close, '22:00'),
+        isClosed: Boolean(entry?.isClosed),
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.date.localeCompare(b.date))
+}
+
 export const normalizeSeats = (value, fallback = 1) => {
   const numeric = Number(value)
   if (!Number.isFinite(numeric)) return fallback

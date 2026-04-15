@@ -4,6 +4,7 @@ import {
   floorObjectToPayload,
   floorToPayload,
   mapFloor,
+  mapOpeningDateOverrides,
   mapOpeningHours,
   mapRestaurant,
   workerRoleToBackend,
@@ -105,6 +106,30 @@ export const upsertWeeklyOpeningHours = (restaurantId, openingHours) => {
   })
 }
 
+export const listOpeningHourOverrides = (restaurantId) =>
+  request(`/restaurants/${restaurantId}/opening-hours/overrides`)
+
+export const getOpeningHourOverrides = async (restaurantId) => {
+  const entries = await listOpeningHourOverrides(restaurantId)
+  return mapOpeningDateOverrides(entries)
+}
+
+export const upsertOpeningHourOverride = (restaurantId, date, entry) =>
+  request(`/restaurants/${restaurantId}/opening-hours/overrides/${date}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      serviceDate: date,
+      openTime: String(entry.open ?? '09:00'),
+      closeTime: String(entry.close ?? '22:00'),
+      closed: Boolean(entry.isClosed),
+    }),
+  })
+
+export const deleteOpeningHourOverride = (restaurantId, date) =>
+  request(`/restaurants/${restaurantId}/opening-hours/overrides/${date}`, {
+    method: 'DELETE',
+  })
+
 export const listMenuFoldersTree = (restaurantId) =>
   request(`/restaurants/${restaurantId}/menu-folders/tree`)
 
@@ -162,10 +187,11 @@ export const fetchRestaurantsGraph = async () => {
 
   const graphs = await Promise.all(
     restaurants.map(async (restaurant) => {
-      const [floors, workers, openingHours, menuFolders, menuItems] = await Promise.all([
+      const [floors, workers, openingHours, openingDateOverrides, menuFolders, menuItems] = await Promise.all([
         listFloors(restaurant.id),
         listWorkers(restaurant.id),
         listOpeningHours(restaurant.id),
+        listOpeningHourOverrides(restaurant.id),
         listMenuFoldersTree(restaurant.id),
         listAllMenuItems(restaurant.id),
       ])
@@ -185,6 +211,7 @@ export const fetchRestaurantsGraph = async () => {
         mappedFloors,
         workers,
         openingHours,
+        openingDateOverrides,
         menuFolders,
         menuItems,
       )
