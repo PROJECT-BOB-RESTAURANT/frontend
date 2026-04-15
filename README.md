@@ -137,7 +137,8 @@ Key files:
 - `src/App.jsx`: top-level page switch that composes route-level page components.
 - `src/hooks/useAppController.js`: application orchestration for backend loading, CRUD flows, and editor drag/drop handlers.
 - `src/pages/*.jsx`: route-level page components for restaurant management, floor management, and editor screens.
-- `src/store/useFloorStore.js`: navigation actions and all domain state.
+- `src/store/useFloorStore.js`: compatibility entrypoint that re-exports the store hook.
+- `src/store/useFloorStore/`: organized store modules (`constants.js`, `normalizers.js`, `workspaceHelpers.js`, `actions.js`, `index.js`).
 
 Refactor note:
 - Hooks and services are split into smaller internal modules.
