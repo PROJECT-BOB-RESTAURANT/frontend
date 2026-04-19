@@ -1,5 +1,5 @@
 import { clearAuthSession, getAuthSession, setAuthSession } from './backendApi/core'
-import { listUsers, login, register } from './backendApi/auth'
+import { deleteUser, listUsers, login, register, updateUser } from './backendApi/auth'
 import { saveFloorLayout } from './backendApi/layout'
 import {
   createFloor,
@@ -44,6 +44,8 @@ export const backendApi = {
   login,
   register,
   listUsers,
+  updateUser,
+  deleteUser,
   setAuthSession,
   clearAuthSession,
   getAuthSession,

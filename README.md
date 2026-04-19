@@ -9,6 +9,7 @@ The current build is frontend-first (Zustand in-memory state), structured so bac
 Current capabilities:
 - Default login page with account sign-in.
 - Admin-only pre-page with entry options for user management and restaurant management.
+- Admin user management with create/list/search/edit/delete flows, including self-delete prevention for the currently logged-in account.
 - Simplified restaurant list cards with a single `Manage Restaurant` action.
 - Sectioned restaurant management hub with dedicated `Restaurant Management`, `Floor Manager`, and `Staff Manager` areas.
 - Fixed user status widget (bottom-left) showing current username and role, with hide and logout actions.
@@ -212,6 +213,7 @@ Current implemented rules:
 From login page:
 - Sign in with username and password
 - Continue to management pages after successful authentication
+- Admin access is granted to any authenticated user that has backend role `ADMIN` (not tied to a fixed username).
 
 From authenticated pages:
 - See active username and role in the bottom-left user status widget
@@ -219,12 +221,17 @@ From authenticated pages:
 - For admins in restaurant flow: return to admin pre-page using the `Admin` button in the user status widget
 
 Admin-only pre-page:
-- `Manage Users`: open admin user creation screen
+- `Manage Users`: open admin user management screen (create user with actual name + username, search users, edit actual name/username/role, delete user)
 - `Manage Restaurants`: continue to restaurant list and operations
 
 ### Backend Integration Notes
 
 - Restaurant and floor create/rename/delete operations are connected to backend endpoints.
+- Admin user-management operations are connected to backend auth endpoints:
+- `POST /auth/register` (create user with `name`, `username`, `password`, `role`)
+- `GET /auth/users` (list/search users)
+- `PATCH /auth/users/{id}` (update name/username/role)
+- `DELETE /auth/users/{id}` (delete user)
 - Worker and menu-folder/menu-item management is connected to backend endpoints.
 - Guest reservations are created through backend reservation endpoints.
 - Waiter orders and reservations are loaded and persisted through backend table/order/reservation endpoints.
@@ -232,6 +239,7 @@ Admin-only pre-page:
 - Table-level backend calls only run for persisted table UUIDs; unsaved local table IDs are blocked in frontend with a save-layout message.
 - Floor planner now refreshes reservation data for all tables on the current floor after backend hydration and restaurant/floor switch, so free/reserved colors stay in sync after user changes.
 - Opening-hours changes are persisted with the `Save Opening Hours` button.
+- If backend user lookup fails for an old username after account changes, sign out and sign back in to refresh the stored auth session/JWT identity.
 
 ## 5.1 Restaurant Management Options
 
