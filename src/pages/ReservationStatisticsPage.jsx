@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { backendApi } from '../services/backendApi'
 import { toDateMs } from '../utils/reservations'
+import { readPaymentEvents } from '../utils/paymentEvents'
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
@@ -112,6 +113,7 @@ function ReservationStatisticsPage({
   const [reservationEnd, setReservationEnd] = useState('')
   const [reservationNote, setReservationNote] = useState('')
   const [kitchenLines, setKitchenLines] = useState([])
+  const [paymentEvents, setPaymentEvents] = useState([])
 
   const dayStart = useMemo(() => buildDayStart(timelineDate), [timelineDate])
   const dayEnd = useMemo(() => {
@@ -214,6 +216,7 @@ function ReservationStatisticsPage({
       }
 
       setReservationsByTableId(next)
+      setPaymentEvents(readPaymentEvents())
       setFeedback('')
     } catch (error) {
       setFeedback(error.message)
@@ -279,6 +282,10 @@ function ReservationStatisticsPage({
     }
   }, [currentRestaurantId, canSeeManagerAnalytics])
 
+  useEffect(() => {
+    setPaymentEvents(readPaymentEvents())
+  }, [currentRestaurantId, timelineDate])
+
   const analytics = useMemo(() => {
     const allReservations = Object.values(reservationsByTableId).flatMap((entry) =>
       Array.isArray(entry) ? entry : [],
@@ -300,15 +307,32 @@ function ReservationStatisticsPage({
       return startMs !== null && endMs !== null && endMs > dayStartMs && startMs < dayEndMs
     })
 
-    const servedLines = kitchenLines.filter((line) => line.status === 'served')
     const openLines = kitchenLines.filter((line) => line.status !== 'served' && line.status !== 'void')
 
-    const servedRevenue = servedLines.reduce(
+    const restaurantPayments = paymentEvents.filter((event) => event.restaurantId === currentRestaurantId)
+
+    const paidRevenue = restaurantPayments.reduce((sum, event) => sum + (Number(event.amount ?? 0) || 0), 0)
+    const tipRevenue = restaurantPayments.reduce((sum, event) => sum + (Number(event.tipAmount ?? 0) || 0), 0)
+    const openRevenue = openLines.reduce(
       (sum, line) => sum + (Number(line.unitPrice ?? 0) || 0) * Math.max(1, Number(line.quantity ?? 1) || 1),
       0,
     )
-    const openRevenue = openLines.reduce(
-      (sum, line) => sum + (Number(line.unitPrice ?? 0) || 0) * Math.max(1, Number(line.quantity ?? 1) || 1),
+
+    const paidTransactionsTotal = restaurantPayments.length
+    const cashPaymentsTotal = restaurantPayments.reduce(
+      (sum, event) => sum + (Number(event.methodBreakdown?.cash ?? 0) || 0),
+      0,
+    )
+    const cardPaymentsTotal = restaurantPayments.reduce(
+      (sum, event) => sum + (Number(event.methodBreakdown?.card ?? 0) || 0),
+      0,
+    )
+    const cashUsageCount = restaurantPayments.reduce(
+      (sum, event) => sum + Math.max(0, Number(event.methodUsageCount?.cash ?? 0) || 0),
+      0,
+    )
+    const cardUsageCount = restaurantPayments.reduce(
+      (sum, event) => sum + Math.max(0, Number(event.methodUsageCount?.card ?? 0) || 0),
       0,
     )
 
@@ -330,32 +354,45 @@ function ReservationStatisticsPage({
       reservationTotal: allReservations.length,
       activeReservationTotal: activeReservations.length,
       todayReservationTotal: todayReservations.length,
-      servedRevenue,
+      paidRevenue,
+      tipRevenue,
       openRevenue,
-      servedLinesTotal: servedLines.length,
+      paidTransactionsTotal,
+      cashPaymentsTotal,
+      cardPaymentsTotal,
+      cashUsageCount,
+      cardUsageCount,
       openLinesTotal: openLines.length,
       reservationCountByFloor,
     }
-  }, [reservationsByTableId, dayStart, dayEnd, kitchenLines, floorsWithTables])
+  }, [
+    reservationsByTableId,
+    dayStart,
+    dayEnd,
+    kitchenLines,
+    floorsWithTables,
+    paymentEvents,
+    currentRestaurantId,
+  ])
 
   const revenueDiagram = useMemo(() => {
-    const served = Math.max(0, Number(analytics.servedRevenue) || 0)
-    const open = Math.max(0, Number(analytics.openRevenue) || 0)
-    const total = served + open
-    const servedPct = total > 0 ? (served / total) * 100 : 0
-    const openPct = total > 0 ? (open / total) * 100 : 0
+    const cash = Math.max(0, Number(analytics.cashPaymentsTotal) || 0)
+    const card = Math.max(0, Number(analytics.cardPaymentsTotal) || 0)
+    const total = cash + card
+    const cashPct = total > 0 ? (cash / total) * 100 : 0
+    const cardPct = total > 0 ? (card / total) * 100 : 0
 
     return {
-      served,
-      open,
+      cash,
+      card,
       total,
-      servedPct,
-      openPct,
+      cashPct,
+      cardPct,
       chartStyle: {
-        background: `conic-gradient(#059669 0% ${servedPct}%, #d97706 ${servedPct}% 100%)`,
+        background: `conic-gradient(#16a34a 0% ${cashPct}%, #2563eb ${cashPct}% 100%)`,
       },
     }
-  }, [analytics.openRevenue, analytics.servedRevenue])
+  }, [analytics.cashPaymentsTotal, analytics.cardPaymentsTotal])
 
   const floorReservationDiagram = useMemo(() => {
     const rows = analytics.reservationCountByFloor
@@ -546,9 +583,15 @@ function ReservationStatisticsPage({
 
             <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <article className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Served Income</p>
-                <p className="mt-1 text-xl font-extrabold text-emerald-900">{formatCurrency(analytics.servedRevenue)}</p>
-                <p className="text-[11px] text-emerald-700">Served lines: {analytics.servedLinesTotal}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Paid Income</p>
+                <p className="mt-1 text-xl font-extrabold text-emerald-900">{formatCurrency(analytics.paidRevenue)}</p>
+                <p className="text-[11px] text-emerald-700">Payments settled: {analytics.paidTransactionsTotal}</p>
+              </article>
+
+              <article className="rounded-lg border border-violet-200 bg-violet-50 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Tips Total</p>
+                <p className="mt-1 text-xl font-extrabold text-violet-900">{formatCurrency(analytics.tipRevenue)}</p>
+                <p className="text-[11px] text-violet-700">Captured at settlement</p>
               </article>
 
               <article className="rounded-lg border border-amber-200 bg-amber-50 p-3">
@@ -582,7 +625,7 @@ function ReservationStatisticsPage({
 
             <div className="mt-3 grid gap-3 lg:grid-cols-2">
               <article className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Revenue Split Diagram</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Cash vs Card Usage</h3>
 
                 <div className="mt-3 flex items-center gap-4">
                   <div className="relative h-24 w-24 rounded-full" style={revenueDiagram.chartStyle}>
@@ -591,14 +634,17 @@ function ReservationStatisticsPage({
 
                   <div className="space-y-1 text-xs text-slate-700">
                     <p>
-                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-600" />{' '}
-                      Served: {formatCurrency(revenueDiagram.served)} ({revenueDiagram.servedPct.toFixed(1)}%)
+                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-green-600" />{' '}
+                      Cash: {formatCurrency(revenueDiagram.cash)} ({revenueDiagram.cashPct.toFixed(1)}%)
                     </p>
                     <p>
-                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-600" />{' '}
-                      Open: {formatCurrency(revenueDiagram.open)} ({revenueDiagram.openPct.toFixed(1)}%)
+                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-600" />{' '}
+                      Card: {formatCurrency(revenueDiagram.card)} ({revenueDiagram.cardPct.toFixed(1)}%)
                     </p>
-                    <p className="font-semibold text-slate-900">Total: {formatCurrency(revenueDiagram.total)}</p>
+                    <p className="font-semibold text-slate-900">Total paid methods: {formatCurrency(revenueDiagram.total)}</p>
+                    <p className="text-[11px] text-slate-600">
+                      Usage count: cash {analytics.cashUsageCount} | card {analytics.cardUsageCount}
+                    </p>
                   </div>
                 </div>
               </article>
