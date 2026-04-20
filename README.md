@@ -16,11 +16,11 @@ Current capabilities:
 - Multi-restaurant management with isolated data contexts.
 - Per-restaurant floor management and canvas editing.
 - Table metadata with seat counts and labels.
-- Waiter table management (orders + reservations + occupancy).
+- Waiter table management (orders + reservations + occupancy + bill settlement).
 - Staff kitchen touchscreen workflow (incoming queue, color-coded statuses, timing panel).
 - Reservation statistics page with per-floor/per-table occupancy timelines and direct reservation creation.
-- Manager analytics cards in reservation statistics for served income, open ticket value, reservation totals, active reservations, and floor-level reservation breakdown.
-- Analytics diagrams in reservation statistics for revenue split and per-floor reservation distribution.
+- Manager analytics cards in reservation statistics for paid income, tip totals, open ticket value, reservation totals, active reservations, and floor-level reservation breakdown.
+- Analytics diagrams in reservation statistics for cash-vs-card usage and per-floor reservation distribution.
 - Floor-wide reservation action that reserves all tables on a selected floor for the same customer and time window.
 - Guest reservation flow (restaurant -> floor -> table -> booking).
 - Restaurant operations setup (workers, opening hours, nested menu catalog).
@@ -89,7 +89,9 @@ Use waiter mode for in-service table operations:
 2. Add catalog or custom order items.
 3. Set worker attribution.
 4. Add reservations or manual occupancy.
-5. Monitor timeline and table status.
+5. Configure payment (cash/card, optional tip, split bill).
+6. Settle bill to clear paid order(s) and remove active reservation(s) on the table.
+7. Monitor timeline and table status.
 
 Use reservation statistics for floor-level booking blocks:
 1. Open reservation statistics.
@@ -189,7 +191,7 @@ Technical notes:
 ## 4.4 Waiter Flow
 
 Waiter panel has two operation sections:
-- `orders`: add catalog/custom items, adjust qty/status/price, assign worker.
+- `orders`: add catalog/custom items, adjust qty/status/price, assign worker, and settle payments (cash/card, optional tip, split bill).
 - `reservations`: add/remove/extend reservations, manual occupancy control, timeline view.
 
 Status behavior:
@@ -321,6 +323,10 @@ Order operations:
 - Assign worker
 - Remove order line
 - Clear all table orders
+- Settle bill with cash or card
+- Add optional tip during settlement
+- Split bill across multiple guests with per-split amount and method
+- On settlement, clear active reservations for the table
 - Receive ready-to-serve notifications for own placed orders with item and table/floor context
 
 Reservation operations:
@@ -348,6 +354,8 @@ Reservation statistics operations:
 - Inspect occupancy timeline for each table grouped by floor
 - View closed (non-operating) periods directly on timelines
 - Add reservation directly from any table timeline row
+- Track paid income and tip totals from settled payments
+- Track cash vs card usage (amount and usage count)
 
 ## 5.4 Guest Reservation Options
 
