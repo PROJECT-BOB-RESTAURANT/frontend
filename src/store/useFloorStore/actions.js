@@ -1370,29 +1370,23 @@ export const createFloorStoreActions = (set, get) => ({
     })
   },
 
-  exportLayout: () => {
+  exportFloorPlanJson: (restaurantId = null) => {
     const state = get()
-    const persistedFloors = persistCurrentFloor(state)
-    const restaurant = state.restaurants.find((item) => item.id === state.currentRestaurantId)
+    const targetRestaurantId = restaurantId ?? state.currentRestaurantId
+    const persistedRestaurants = persistCurrentRestaurant(state)
+    const restaurant = persistedRestaurants.find((item) => item.id === targetRestaurantId)
+    const floors = restaurant?.floors ?? []
 
     return JSON.stringify(
       {
-        restaurant: restaurant
-          ? {
-              id: restaurant.id,
-              name: restaurant.name,
-              workers: normalizeWorkers(restaurant.workers),
-              goodsCatalog: normalizeMenuFolders(restaurant.goodsCatalog ?? restaurant.goodsCategories),
-              openingHours: normalizeOpeningHours(restaurant.openingHours),
-              openingDateOverrides: normalizeOpeningDateOverrides(restaurant.openingDateOverrides),
-            }
-          : null,
-        floors: persistedFloors.map((floor) => ({
+        floors: floors.map((floor) => ({
           id: floor.id,
           name: floor.name,
           size: floor.size ?? null,
           createdAt: floor.createdAt,
           updatedAt: floor.updatedAt,
+          canvasZoom: floor.canvasZoom ?? DEFAULT_CANVAS_ZOOM,
+          canvasPosition: floor.canvasPosition ?? { ...DEFAULT_CANVAS_POSITION },
           objects: floor.objects.map((obj) => ({
             id: obj.id,
             type: obj.type,
@@ -1414,82 +1408,190 @@ export const createFloorStoreActions = (set, get) => ({
     )
   },
 
-  loadLayout: (payload) => {
+  exportRestaurantJson: (restaurantId = null) => {
+    const state = get()
+    const targetRestaurantId = restaurantId ?? state.currentRestaurantId
+    const persistedRestaurants = persistCurrentRestaurant(state)
+    const restaurant = persistedRestaurants.find((item) => item.id === targetRestaurantId)
+    const floors = restaurant?.floors ?? []
+
+    return JSON.stringify(
+      {
+        restaurant: restaurant
+          ? {
+              id: restaurant.id,
+              name: restaurant.name,
+              workers: normalizeWorkers(restaurant.workers),
+              goodsCatalog: normalizeMenuFolders(restaurant.goodsCatalog ?? restaurant.goodsCategories),
+              openingHours: normalizeOpeningHours(restaurant.openingHours),
+              openingDateOverrides: normalizeOpeningDateOverrides(restaurant.openingDateOverrides),
+            }
+          : null,
+        floors: floors.map((floor) => ({
+          id: floor.id,
+          name: floor.name,
+          size: floor.size ?? null,
+          createdAt: floor.createdAt,
+          updatedAt: floor.updatedAt,
+          canvasZoom: floor.canvasZoom ?? DEFAULT_CANVAS_ZOOM,
+          canvasPosition: floor.canvasPosition ?? { ...DEFAULT_CANVAS_POSITION },
+          objects: floor.objects.map((obj) => ({
+            id: obj.id,
+            type: obj.type,
+            x: obj.x,
+            y: obj.y,
+            width: obj.width,
+            height: obj.height,
+            rotation: obj.rotation,
+            scaleX: obj.scaleX,
+            scaleY: obj.scaleY,
+            seats: obj.metadata?.seats ?? 0,
+            label: obj.metadata?.label ?? '',
+            metadata: obj.metadata,
+          })),
+        })),
+      },
+      null,
+      2,
+    )
+  },
+
+  loadFloorPlanJson: (payload, restaurantId = null) => {
     const parsed = JSON.parse(payload)
 
-    if (Array.isArray(parsed.objects)) {
-      const legacyFloor = createFloorModel('Imported Floor')
-      legacyFloor.objects = parsed.objects.map((obj) => normalizeObject(obj))
-      legacyFloor.updatedAt = Date.now()
+    set((state) => {
+      const targetRestaurantId = restaurantId ?? state.currentRestaurantId
+      if (!targetRestaurantId) {
+        throw new Error('No restaurant selected.')
+      }
 
-      const state = get()
-      const restaurants = persistRestaurantFloors(
-        state.restaurants,
-        state.currentRestaurantId,
-        [legacyFloor],
-      )
+      let parsedFloors = parsed.floors
 
-      set({
+      if (Array.isArray(parsed.objects)) {
+        const legacyFloor = createFloorModel('Imported Floor')
+        legacyFloor.objects = parsed.objects.map((obj) => normalizeObject(obj))
+        legacyFloor.updatedAt = Date.now()
+        parsedFloors = [legacyFloor]
+      }
+
+      if (!Array.isArray(parsedFloors)) {
+        throw new Error('Layout JSON must include a floors array')
+      }
+
+      const importedFloors = parsedFloors.map((floor, index) => ({
+        id: floor.id ?? createId('floor'),
+        name: floor.name ?? `Floor ${index + 1}`,
+        size: floor.size ?? null,
+        createdAt: floor.createdAt ?? Date.now(),
+        updatedAt: Date.now(),
+        canvasZoom: floor.canvasZoom ?? DEFAULT_CANVAS_ZOOM,
+        canvasPosition: floor.canvasPosition ?? { ...DEFAULT_CANVAS_POSITION },
+        objects: Array.isArray(floor.objects) ? floor.objects.map((obj) => normalizeObject(obj)) : [],
+      }))
+
+      const persistedRestaurants = persistCurrentRestaurant(state)
+      const existingFloors =
+        persistedRestaurants.find((restaurant) => restaurant.id === targetRestaurantId)?.floors ?? []
+      const mergedFloorMap = new Map(existingFloors.map((floor) => [floor.id, floor]))
+
+      for (const importedFloor of importedFloors) {
+        mergedFloorMap.set(importedFloor.id, importedFloor)
+      }
+
+      const mergedFloors = Array.from(mergedFloorMap.values())
+      const fallbackFloor = existingFloors[0] ?? createFloorModel('Ground Floor')
+      const nextSelectedFloor = importedFloors[0] ?? fallbackFloor
+      const restaurants = persistRestaurantFloors(persistedRestaurants, targetRestaurantId, mergedFloors)
+
+      if (state.currentRestaurantId !== targetRestaurantId) {
+        return { restaurants }
+      }
+
+      return {
         restaurants,
-        floors: [legacyFloor],
-        currentFloorId: legacyFloor.id,
-        objects: cloneObjects(legacyFloor.objects),
+        floors: mergedFloors.length > 0 ? mergedFloors : [fallbackFloor],
+        currentFloorId: nextSelectedFloor.id,
+        objects: cloneObjects(nextSelectedFloor.objects),
+        canvasZoom: nextSelectedFloor.canvasZoom,
+        canvasPosition: nextSelectedFloor.canvasPosition,
         selectedObjectId: null,
-      })
-      return
-    }
-
-    if (!Array.isArray(parsed.floors)) {
-      throw new Error('Layout JSON must include a floors array')
-    }
-
-    const floors = parsed.floors.map((floor, index) => ({
-      id: floor.id ?? createId('floor'),
-      name: floor.name ?? `Floor ${index + 1}`,
-      size: floor.size ?? null,
-      createdAt: floor.createdAt ?? Date.now(),
-      updatedAt: Date.now(),
-      canvasZoom: floor.canvasZoom ?? DEFAULT_CANVAS_ZOOM,
-      canvasPosition: floor.canvasPosition ?? { ...DEFAULT_CANVAS_POSITION },
-      objects: Array.isArray(floor.objects)
-        ? floor.objects.map((obj) => normalizeObject(obj))
-        : [],
-    }))
-
-    const firstFloor = floors[0] ?? createFloorModel('Ground Floor')
-
-    const state = get()
-    const restaurants = persistRestaurantFloors(state.restaurants, state.currentRestaurantId, floors).map(
-      (restaurant) => {
-        if (restaurant.id !== state.currentRestaurantId) return restaurant
-
-        return {
-          ...restaurant,
-          workers: normalizeWorkers(parsed.restaurant?.workers ?? restaurant.workers),
-          goodsCatalog: normalizeMenuFolders(
-            parsed.restaurant?.goodsCatalog ??
-              parsed.restaurant?.goodsCategories ??
-              restaurant.goodsCatalog ??
-              restaurant.goodsCategories,
-          ),
-          openingHours: normalizeOpeningHours(
-            parsed.restaurant?.openingHours ?? restaurant.openingHours,
-          ),
-          openingDateOverrides: normalizeOpeningDateOverrides(
-            parsed.restaurant?.openingDateOverrides ?? restaurant.openingDateOverrides,
-          ),
-        }
-      },
-    )
-
-    set({
-      restaurants,
-      floors: floors.length > 0 ? floors : [firstFloor],
-      currentFloorId: firstFloor.id,
-      objects: cloneObjects(firstFloor.objects),
-      canvasZoom: firstFloor.canvasZoom,
-      canvasPosition: firstFloor.canvasPosition,
-      selectedObjectId: null,
+      }
     })
   },
+
+  loadRestaurantJson: (payload, restaurantId = null) => {
+    const parsed = JSON.parse(payload)
+
+    set((state) => {
+      const targetRestaurantId = restaurantId ?? state.currentRestaurantId
+      if (!targetRestaurantId) {
+        throw new Error('No restaurant selected.')
+      }
+
+      let parsedFloors = parsed.floors
+
+      if (Array.isArray(parsed.objects)) {
+        const legacyFloor = createFloorModel('Imported Floor')
+        legacyFloor.objects = parsed.objects.map((obj) => normalizeObject(obj))
+        legacyFloor.updatedAt = Date.now()
+        parsedFloors = [legacyFloor]
+      }
+
+      if (!Array.isArray(parsedFloors)) {
+        throw new Error('Layout JSON must include a floors array')
+      }
+
+      const floors = parsedFloors.map((floor, index) => ({
+        id: floor.id ?? createId('floor'),
+        name: floor.name ?? `Floor ${index + 1}`,
+        size: floor.size ?? null,
+        createdAt: floor.createdAt ?? Date.now(),
+        updatedAt: Date.now(),
+        canvasZoom: floor.canvasZoom ?? DEFAULT_CANVAS_ZOOM,
+        canvasPosition: floor.canvasPosition ?? { ...DEFAULT_CANVAS_POSITION },
+        objects: Array.isArray(floor.objects) ? floor.objects.map((obj) => normalizeObject(obj)) : [],
+      }))
+
+      const firstFloor = floors[0] ?? createFloorModel('Ground Floor')
+      const persistedRestaurants = persistCurrentRestaurant(state)
+      const restaurants = persistRestaurantFloors(persistedRestaurants, targetRestaurantId, floors).map(
+        (restaurant) => {
+          if (restaurant.id !== targetRestaurantId) return restaurant
+
+          return {
+            ...restaurant,
+            name: parsed.restaurant?.name ?? restaurant.name,
+            workers: normalizeWorkers(parsed.restaurant?.workers ?? restaurant.workers),
+            goodsCatalog: normalizeMenuFolders(
+              parsed.restaurant?.goodsCatalog ??
+                parsed.restaurant?.goodsCategories ??
+                restaurant.goodsCatalog ??
+                restaurant.goodsCategories,
+            ),
+            openingHours: normalizeOpeningHours(parsed.restaurant?.openingHours ?? restaurant.openingHours),
+            openingDateOverrides: normalizeOpeningDateOverrides(
+              parsed.restaurant?.openingDateOverrides ?? restaurant.openingDateOverrides,
+            ),
+          }
+        },
+      )
+
+      if (state.currentRestaurantId !== targetRestaurantId) {
+        return { restaurants }
+      }
+
+      return {
+        restaurants,
+        floors: floors.length > 0 ? floors : [firstFloor],
+        currentFloorId: firstFloor.id,
+        objects: cloneObjects(firstFloor.objects),
+        canvasZoom: firstFloor.canvasZoom,
+        canvasPosition: firstFloor.canvasPosition,
+        selectedObjectId: null,
+      }
+    })
+  },
+
+  exportLayout: (restaurantId = null) => get().exportRestaurantJson(restaurantId),
+  loadLayout: (payload, restaurantId = null) => get().loadRestaurantJson(payload, restaurantId),
 })

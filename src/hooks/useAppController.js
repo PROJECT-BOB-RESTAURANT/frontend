@@ -36,6 +36,9 @@ function useAppController(role) {
   const waiterWorkerId = useFloorStore((state) => state.waiterWorkerId)
   const selectedObjectId = useFloorStore((state) => state.selectedObjectId)
   const setTableReservationsData = useFloorStore((state) => state.setTableReservationsData)
+  const exportFloorPlanJson = useFloorStore((state) => state.exportFloorPlanJson)
+  const exportRestaurantJson = useFloorStore((state) => state.exportRestaurantJson)
+  const storeLoadRestaurantJson = useFloorStore((state) => state.loadRestaurantJson)
 
   const [isBackendLoading, setIsBackendLoading] = useState(false)
   const [backendFeedback, setBackendFeedback] = useState('')
@@ -101,6 +104,106 @@ function useAppController(role) {
       waiterWorkerId,
       selectedObjectId,
     ],
+  )
+
+  const importFloorPlanJson = useCallback(
+    async (payload, restaurantId = currentRestaurantId) => {
+      if (role !== 'ADMIN') {
+        throw new Error('Only admins can import floor plan JSON.')
+      }
+
+      if (!restaurantId) {
+        throw new Error('No restaurant selected.')
+      }
+
+      const parsed = JSON.parse(payload)
+      let parsedFloors = parsed.floors
+
+      if (Array.isArray(parsed.objects)) {
+        parsedFloors = [
+          {
+            name: 'Imported Floor',
+            objects: parsed.objects,
+          },
+        ]
+      }
+
+      if (!Array.isArray(parsedFloors)) {
+        throw new Error('Layout JSON must include a floors array')
+      }
+
+      setIsBackendLoading(true)
+      try {
+        const backendFloors = await backendApi.listFloors(restaurantId)
+        const backendFloorIds = new Set((backendFloors ?? []).map((floor) => floor.id))
+
+        for (const [index, floor] of parsedFloors.entries()) {
+          const preparedFloor = {
+            id: floor.id,
+            name: floor.name ?? `Floor ${index + 1}`,
+            size: floor.size ?? null,
+            canvasZoom: floor.canvasZoom ?? 1,
+            canvasPosition: floor.canvasPosition ?? { x: 160, y: 90 },
+            objects: Array.isArray(floor.objects) ? floor.objects : [],
+          }
+
+          let persistedFloorId = preparedFloor.id
+
+          if (persistedFloorId && backendFloorIds.has(persistedFloorId)) {
+            await backendApi.updateFloor(restaurantId, persistedFloorId, preparedFloor)
+          } else {
+            const createdFloor = await backendApi.createFloor(restaurantId, preparedFloor)
+            persistedFloorId = createdFloor?.id ?? createdFloor
+          }
+
+          await backendApi.saveFloorLayout(restaurantId, {
+            ...preparedFloor,
+            id: persistedFloorId,
+          })
+        }
+
+        await reloadFromBackend('Floor plan imported and saved.')
+      } catch (error) {
+        setBackendFeedback(error.message)
+        throw error
+      } finally {
+        setIsBackendLoading(false)
+      }
+    },
+    [currentRestaurantId, reloadFromBackend, setBackendFeedback, setIsBackendLoading],
+  )
+
+  const exportFloorPlanJsonForAdmin = useCallback(
+    (restaurantId = currentRestaurantId) => {
+      if (role !== 'ADMIN') {
+        throw new Error('Only admins can export floor plan JSON.')
+      }
+
+      return exportFloorPlanJson(restaurantId)
+    },
+    [currentRestaurantId, exportFloorPlanJson, role],
+  )
+
+  const exportRestaurantJsonForAdmin = useCallback(
+    (restaurantId = currentRestaurantId) => {
+      if (role !== 'ADMIN') {
+        throw new Error('Only admins can export restaurant JSON.')
+      }
+
+      return exportRestaurantJson(restaurantId)
+    },
+    [currentRestaurantId, exportRestaurantJson, role],
+  )
+
+  const loadRestaurantJsonForAdmin = useCallback(
+    (payload, restaurantId = currentRestaurantId) => {
+      if (role !== 'ADMIN') {
+        throw new Error('Only admins can import restaurant JSON.')
+      }
+
+      return storeLoadRestaurantJson(payload, restaurantId)
+    },
+    [currentRestaurantId, role, storeLoadRestaurantJson],
   )
 
   useEffect(() => {
@@ -219,6 +322,10 @@ function useAppController(role) {
     renameFloor,
     deleteFloor,
     onSaveCurrentFloorLayout,
+    exportFloorPlanJson: exportFloorPlanJsonForAdmin,
+    loadFloorPlanJson: importFloorPlanJson,
+    exportRestaurantJson: exportRestaurantJsonForAdmin,
+    loadRestaurantJson: loadRestaurantJsonForAdmin,
     onDragEnd,
   }
 }

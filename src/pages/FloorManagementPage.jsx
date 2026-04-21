@@ -1,3 +1,5 @@
+import { useRef, useState } from 'react'
+
 function FloorManagementPage({
   role,
   currentRestaurant,
@@ -17,10 +19,64 @@ function FloorManagementPage({
   onOpenKitchenMenu,
   onOpenReservationStatistics,
   onOpenGuestReservationPage,
+  onExportFloorPlanJson,
+  onImportFloorPlanJson,
   goodsManager,
 }) {
   const isStaff = role === 'STAFF'
+  const isAdmin = role === 'ADMIN'
   const currentRestaurantName = currentRestaurant?.name ?? 'Restaurant'
+  const floorPlanFileRef = useRef(null)
+  const [floorPlanJsonText, setFloorPlanJsonText] = useState('')
+  const [floorPlanFeedback, setFloorPlanFeedback] = useState('')
+
+  const downloadFloorPlanJson = () => {
+    if (!currentRestaurantId || typeof onExportFloorPlanJson !== 'function') {
+      setFloorPlanFeedback('No restaurant selected.')
+      return
+    }
+
+    const data = onExportFloorPlanJson(currentRestaurantId)
+    const blob = new Blob([data], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `floor-plan-${Date.now()}.json`
+    anchor.click()
+    URL.revokeObjectURL(url)
+    setFloorPlanFeedback('Exported floor plan JSON file.')
+  }
+
+  const importFloorPlanJson = async () => {
+    if (!currentRestaurantId || typeof onImportFloorPlanJson !== 'function') {
+      setFloorPlanFeedback('No restaurant selected.')
+      return
+    }
+
+    try {
+      await onImportFloorPlanJson(floorPlanJsonText, currentRestaurantId)
+      setFloorPlanFeedback('Imported floor plan JSON.')
+    } catch (error) {
+      setFloorPlanFeedback(error.message)
+    }
+  }
+
+  const onSelectFloorPlanFile = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) {
+      return
+    }
+
+    try {
+      const text = await file.text()
+      setFloorPlanJsonText(text)
+      setFloorPlanFeedback(`Loaded ${file.name}.`)
+    } catch (error) {
+      setFloorPlanFeedback(error.message)
+    } finally {
+      event.target.value = ''
+    }
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-6">
@@ -161,6 +217,59 @@ function FloorManagementPage({
               >
                 Add New Floor
               </button>
+            </div>
+          ) : null}
+
+          {isAdmin ? (
+            <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Floor Plan JSON
+              </h3>
+
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                <button
+                  type="button"
+                  className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+                  onClick={downloadFloorPlanJson}
+                  disabled={!currentRestaurantId}
+                >
+                  Export Floor Plan
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
+                  onClick={() => floorPlanFileRef.current?.click()}
+                >
+                  Load JSON File
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-500"
+                  onClick={importFloorPlanJson}
+                  disabled={!floorPlanJsonText.trim() || !currentRestaurantId}
+                >
+                  Import Floor Plan
+                </button>
+              </div>
+
+              <input
+                ref={floorPlanFileRef}
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={onSelectFloorPlanFile}
+              />
+
+              <textarea
+                className="mt-2 h-28 w-full rounded-md border border-slate-200 p-2 text-xs"
+                placeholder="Paste floor plan JSON here..."
+                value={floorPlanJsonText}
+                onChange={(event) => setFloorPlanJsonText(event.target.value)}
+              />
+
+              {floorPlanFeedback ? (
+                <p className="mt-1 text-[11px] text-slate-500">{floorPlanFeedback}</p>
+              ) : null}
             </div>
           ) : null}
 

@@ -16,6 +16,9 @@ Current capabilities:
 - Dedicated workers management page where restaurant workers are assigned from searchable system users.
 - Multi-restaurant management with isolated data contexts.
 - Per-restaurant floor management and canvas editing.
+- Scoped JSON portability tools:
+	- admin-only floor-plan JSON import/export in Floor Manager
+	- admin-only full-restaurant JSON import/export in Restaurant Management
 - Table metadata with seat counts and labels.
 - Waiter table management (orders + reservations + occupancy + bill settlement).
 - Staff kitchen touchscreen workflow (incoming queue, color-coded statuses, timing panel).
@@ -183,7 +186,11 @@ Layout flow:
 2. Drag object preset from library to canvas.
 3. Move/resize/rotate objects.
 4. Edit metadata in inspector (including table seats).
-5. Export/import floor data as needed.
+5. Save layout to backend from editor when table IDs must be persisted.
+
+JSON import/export flow:
+- Floor Manager page: import/export floor-plan JSON without overriding restaurant-level data; imported floors are persisted to backend during import.
+- Restaurant Management page: import/export full restaurant JSON including restaurant details and floors.
 
 Technical notes:
 - Canvas interactions are handled through `dnd-kit`.
@@ -248,6 +255,7 @@ Admin-only pre-page:
 From restaurants view:
 - Add restaurant
 - Open selected restaurant via `Manage Restaurant`
+- For admins: import/export full restaurant JSON from the `Restaurant JSON` section
 
 From restaurant management hub (`Restaurant Management` section):
 - Open kitchen
@@ -257,6 +265,9 @@ From restaurant management hub (`Restaurant Management` section):
 From restaurant management hub (`Admin Buttons` section):
 - Rename restaurant
 - Delete restaurant
+
+From restaurant management hub (`Floor Manager` section):
+- Import/export floor-plan JSON from the `Floor Plan JSON` section
 
 From restaurant management hub (`Floor Manager` section):
 - Add floor
@@ -286,6 +297,7 @@ From floor management:
 - Open floor in view mode
 - Open floor in edit mode
 - For manager/admin: add floor, rename floor, delete floor
+- For admins: export/import floor-plan JSON in the `Floor Plan JSON` section
 
 From editor:
 - Switch edit/view mode
@@ -294,7 +306,7 @@ From editor:
 - Edit object dimensions and metadata
 - Set table seats
 - Toggle snapping
-- Export and import floor data (admin only)
+- Save current floor layout to backend
 
 Confirmation dialogs:
 - Delete restaurant requires explicit confirmation.
@@ -311,7 +323,7 @@ Floor planner UX behavior:
 - Floor planner toolbar includes a `Time` selector to preview table free/reserved colors at any chosen datetime
 - Floor planner `Time` includes `-` and `+` step buttons (30 minutes) for quick backward/forward availability preview
 - Floor viewer toolbar includes a `Restore View` button to instantly return canvas zoom and position to centered defaults
-- JSON layout tools are visible only for admin users
+- Floor-plan JSON tools are shown in Floor Manager for admins only (not in editor side panels)
 - Staff users in planner view only get table service actions (no object data editing panels), including `Manage Table` and `Manage Reservation` when selecting a table
 - Manager and admin can place new library elements in both edit mode and table/view mode
 - Planner side panels use larger widths/heights for easier touch navigation
