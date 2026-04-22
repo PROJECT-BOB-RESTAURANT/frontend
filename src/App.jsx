@@ -39,6 +39,8 @@ function AppContent({ role }) {
         isBackendLoading={controller.isBackendLoading}
         onCreateRestaurant={controller.createRestaurant}
         onOpenRestaurant={controller.openRestaurant}
+        onExportRestaurantJson={controller.exportRestaurantJson}
+        onImportRestaurantJson={controller.loadRestaurantJson}
       />
     )
   }
@@ -77,6 +79,8 @@ function AppContent({ role }) {
         onOpenKitchenMenu={controller.openKitchenForRestaurant}
         onOpenReservationStatistics={controller.openReservationStatisticsForRestaurant}
         onOpenGuestReservationPage={controller.openGuestReservationPage}
+        onExportFloorPlanJson={controller.exportFloorPlanJson}
+        onImportFloorPlanJson={controller.loadFloorPlanJson}
         goodsManager={!isStaff ? <RestaurantGoodsManager /> : null}
       />
     )

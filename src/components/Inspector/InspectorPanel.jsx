@@ -1,4 +1,3 @@
-import { useMemo, useState } from 'react'
 import { useFloorStore } from '../../store/useFloorStore'
 import { isTableObjectType } from '../../utils/objectLibrary'
 
@@ -14,31 +13,14 @@ export const InspectorPanel = ({ role }) => {
     state.objects.find((item) => item.id === state.selectedObjectId) ?? null,
   )
   const updateObject = useFloorStore((state) => state.updateObject)
-  const exportLayout = useFloorStore((state) => state.exportLayout)
-  const loadLayout = useFloorStore((state) => state.loadLayout)
   const duplicateSelectedObject = useFloorStore((state) => state.duplicateSelectedObject)
   const openWaiterForTable = useFloorStore((state) => state.openWaiterForTable)
   const editorMode = useFloorStore((state) => state.editorMode)
   const canEdit = editorMode === 'edit'
-  const isAdmin = role === 'ADMIN'
   const isStaff = role === 'STAFF'
   const canAdjustTransform = canEdit || (!isStaff && role !== undefined)
-
-  const [jsonText, setJsonText] = useState('')
-  const [feedback, setFeedback] = useState('')
-
-  const exportPreview = useMemo(() => exportLayout(), [exportLayout])
   const isTable = selectedObject ? isTableObjectType(selectedObject.type) : false
   const showStaffTableOnlyActions = isStaff && !canEdit
-
-  const onLoad = () => {
-    try {
-      loadLayout(jsonText)
-      setFeedback('Layout loaded successfully.')
-    } catch (error) {
-      setFeedback(error.message)
-    }
-  }
 
   return (
     <aside className="flex h-full min-h-0 flex-col border-l border-slate-200 bg-white/75 backdrop-blur">
@@ -241,46 +223,6 @@ export const InspectorPanel = ({ role }) => {
               : 'Select an object to edit its properties.'}
           </div>
         )}
-
-        {isAdmin ? (
-          <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Save / Load Layout
-            </h3>
-
-            <textarea
-              className="h-28 w-full rounded-md border border-slate-200 p-2 text-xs"
-              value={jsonText || exportPreview}
-              disabled={!canEdit}
-              onChange={(event) => setJsonText(event.target.value)}
-            />
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                className="min-h-11 rounded-md bg-sky-600 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-500"
-                disabled={!canEdit}
-                onClick={() => {
-                  const next = exportLayout()
-                  setJsonText(next)
-                  setFeedback('Layout exported into editor.')
-                }}
-              >
-                Export JSON
-              </button>
-              <button
-                type="button"
-                className="min-h-11 rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500"
-                disabled={!canEdit}
-                onClick={onLoad}
-              >
-                Load JSON
-              </button>
-            </div>
-
-            {feedback ? <p className="text-[11px] text-slate-500">{feedback}</p> : null}
-          </div>
-        ) : null}
       </div>
     </aside>
   )

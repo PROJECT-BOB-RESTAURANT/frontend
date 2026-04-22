@@ -117,7 +117,9 @@ export const request = async (path, options = {}) => {
   if (response.status === 204) return null
 
   const text = await response.text()
-  const payload = text ? JSON.parse(text) : null
+  const trimmedText = text.trim()
+  const parsedPayload = parseJsonSafely(trimmedText, null)
+  const payload = parsedPayload ?? (trimmedText ? trimmedText : null)
 
   if (!response.ok) {
     throw new Error(extractErrorMessage(payload, `Request failed with ${response.status}`))
