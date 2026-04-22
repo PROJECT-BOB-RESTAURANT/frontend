@@ -19,6 +19,8 @@ export const useFloorStore = create((set, get) => ({
   canvasZoom: DEFAULT_CANVAS_ZOOM,
   canvasPosition: { ...DEFAULT_CANVAS_POSITION },
   snapEnabled: true,
+  editorUndoStack: [],
+  editorRedoStack: [],
 
   ...createFloorStoreActions(set, get),
 }))

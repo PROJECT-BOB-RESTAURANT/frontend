@@ -40,8 +40,51 @@ import {
   persistRestaurantFloors,
   updateCurrentRestaurant,
 } from './workspaceHelpers'
+import {
+  applyEditorSnapshot,
+  createEditorSnapshot,
+  EDITOR_HISTORY_LIMIT,
+  isSameEditorSnapshot,
+  isSnapshotForCurrentWorkspace,
+} from './history'
 
-export const createFloorStoreActions = (set, get) => ({
+export const createFloorStoreActions = (set, get) => {
+  const resetEditorHistoryState = {
+    editorUndoStack: [],
+    editorRedoStack: [],
+  }
+
+  const isEditorHistoryTrackable = (state) =>
+    state.page === 'editor'
+    && Boolean(state.currentRestaurantId)
+    && Boolean(state.currentFloorId)
+
+  const recordEditorSnapshot = () => {
+    const snapshot = createEditorSnapshot(get())
+
+    set((state) => {
+      if (!isEditorHistoryTrackable(state)) {
+        return {}
+      }
+
+      const lastSnapshot = state.editorUndoStack[state.editorUndoStack.length - 1] ?? null
+      if (lastSnapshot && isSameEditorSnapshot(lastSnapshot, snapshot)) {
+        return {}
+      }
+
+      const nextUndoStack = [...state.editorUndoStack, snapshot]
+      if (nextUndoStack.length > EDITOR_HISTORY_LIMIT) {
+        nextUndoStack.shift()
+      }
+
+      return {
+        editorUndoStack: nextUndoStack,
+        editorRedoStack: [],
+      }
+    })
+  }
+
+  return {
   setSnapEnabled: (enabled) => set({ snapEnabled: Boolean(enabled) }),
   setSelectedObject: (id) => set({ selectedObjectId: id }),
 
@@ -349,6 +392,7 @@ export const createFloorStoreActions = (set, get) => ({
         page: 'editor',
         waiterTableId: null,
         waiterWorkerId: null,
+        ...resetEditorHistoryState,
       }
     })
   },
@@ -360,6 +404,7 @@ export const createFloorStoreActions = (set, get) => ({
       selectedObjectId: null,
       waiterTableId: null,
       waiterWorkerId: null,
+      ...resetEditorHistoryState,
     }))
   },
 
@@ -436,6 +481,7 @@ export const createFloorStoreActions = (set, get) => ({
         editorMode: mode,
         waiterTableId: null,
         waiterWorkerId: null,
+        ...resetEditorHistoryState,
       }
     })
   },
@@ -447,23 +493,89 @@ export const createFloorStoreActions = (set, get) => ({
       selectedObjectId: null,
       waiterTableId: null,
       waiterWorkerId: null,
+      ...resetEditorHistoryState,
     }))
   },
 
   switchFloorInEditor: (floorId) => {
     set((state) => {
       const persistedFloors = persistCurrentFloor(state)
-      return loadFloorIntoEditor(
+      const nextState = loadFloorIntoEditor(
         {
           ...state,
           floors: persistedFloors,
         },
         floorId,
       )
+
+      return {
+        ...nextState,
+        ...resetEditorHistoryState,
+      }
     })
   },
 
   setEditorMode: (mode) => set({ editorMode: mode }),
+
+  undoEditorChange: () => {
+    set((state) => {
+      if (!isEditorHistoryTrackable(state) || state.editorUndoStack.length === 0) {
+        return {}
+      }
+
+      const previousSnapshot = state.editorUndoStack[state.editorUndoStack.length - 1]
+      if (!isSnapshotForCurrentWorkspace(previousSnapshot, state)) {
+        return {
+          ...resetEditorHistoryState,
+        }
+      }
+
+      const currentSnapshot = createEditorSnapshot(state)
+      const nextUndoStack = state.editorUndoStack.slice(0, -1)
+      const nextRedoStack = [currentSnapshot, ...state.editorRedoStack]
+      if (nextRedoStack.length > EDITOR_HISTORY_LIMIT) {
+        nextRedoStack.pop()
+      }
+
+      const nextState = applyEditorSnapshot(state, previousSnapshot)
+      return {
+        ...nextState,
+        editorUndoStack: nextUndoStack,
+        editorRedoStack: nextRedoStack,
+      }
+    })
+  },
+
+  redoEditorChange: () => {
+    set((state) => {
+      if (!isEditorHistoryTrackable(state) || state.editorRedoStack.length === 0) {
+        return {}
+      }
+
+      const nextSnapshot = state.editorRedoStack[0]
+      if (!isSnapshotForCurrentWorkspace(nextSnapshot, state)) {
+        return {
+          ...resetEditorHistoryState,
+        }
+      }
+
+      const currentSnapshot = createEditorSnapshot(state)
+      const nextRedoStack = state.editorRedoStack.slice(1)
+      const nextUndoStack = [...state.editorUndoStack, currentSnapshot]
+      if (nextUndoStack.length > EDITOR_HISTORY_LIMIT) {
+        nextUndoStack.shift()
+      }
+
+      const nextState = applyEditorSnapshot(state, nextSnapshot)
+      return {
+        ...nextState,
+        editorUndoStack: nextUndoStack,
+        editorRedoStack: nextRedoStack,
+      }
+    })
+  },
+
+  clearEditorHistory: () => set({ ...resetEditorHistoryState }),
 
   setReservationPreviewAt: (value) => {
     const normalizedValue = typeof value === 'string' ? value.trim() : ''
@@ -544,6 +656,7 @@ export const createFloorStoreActions = (set, get) => ({
       waiterWorkerId: fallbackWorkerId,
       waiterActiveSection: section === 'reservations' ? 'reservations' : 'orders',
       selectedObjectId: tableId,
+      ...resetEditorHistoryState,
     })
   },
 
@@ -554,6 +667,7 @@ export const createFloorStoreActions = (set, get) => ({
       waiterTableId: null,
       waiterWorkerId: null,
       waiterActiveSection: 'orders',
+      ...resetEditorHistoryState,
     })
   },
 
@@ -1074,6 +1188,8 @@ export const createFloorStoreActions = (set, get) => ({
   },
 
   addObjectFromPreset: (preset, x, y) => {
+    recordEditorSnapshot()
+
     const snapEnabled = get().snapEnabled
     const object = normalizeObject({
       ...preset.config,
@@ -1090,6 +1206,8 @@ export const createFloorStoreActions = (set, get) => ({
   },
 
   updateObject: (id, updates) => {
+    recordEditorSnapshot()
+
     const snapEnabled = get().snapEnabled
     const normalizedUpdates = { ...updates }
 
@@ -1177,6 +1295,8 @@ export const createFloorStoreActions = (set, get) => ({
     const selectedObjectId = get().selectedObjectId
     if (!selectedObjectId) return
 
+    recordEditorSnapshot()
+
     set((state) => ({
       objects: state.objects.filter((obj) => obj.id !== selectedObjectId),
       selectedObjectId: null,
@@ -1191,6 +1311,8 @@ export const createFloorStoreActions = (set, get) => ({
 
     const source = get().objects.find((obj) => obj.id === selectedObjectId)
     if (!source) return
+
+    recordEditorSnapshot()
 
     const duplicated = normalizeObject({
       ...source,
@@ -1209,7 +1331,10 @@ export const createFloorStoreActions = (set, get) => ({
     }))
   },
 
-  setCanvasZoom: (zoom) => set({ canvasZoom: clamp(zoom, MIN_ZOOM, MAX_ZOOM) }),
+  setCanvasZoom: (zoom) => {
+    recordEditorSnapshot()
+    set({ canvasZoom: clamp(zoom, MIN_ZOOM, MAX_ZOOM) })
+  },
 
   panCanvasBy: (dx, dy) => {
     set((state) => ({
@@ -1243,6 +1368,7 @@ export const createFloorStoreActions = (set, get) => ({
           waiterTableId: null,
           waiterWorkerId: null,
           page: options.page ?? 'restaurant-management',
+          ...resetEditorHistoryState,
         }
       }
 
@@ -1306,6 +1432,7 @@ export const createFloorStoreActions = (set, get) => ({
         waiterTableId: waiterTableExists ? options.waiterTableId : null,
         waiterWorkerId: options.waiterWorkerId ?? state.waiterWorkerId,
         selectedObjectId: selectedObjectExists ? options.selectedObjectId : null,
+        ...resetEditorHistoryState,
       }
     })
   },
@@ -1338,6 +1465,7 @@ export const createFloorStoreActions = (set, get) => ({
         objects: state.objects.map(remapObject),
         selectedObjectId: nextSelectedObjectId,
         waiterTableId: nextWaiterTableId,
+        ...resetEditorHistoryState,
       }
     })
   },
@@ -1435,6 +1563,7 @@ export const createFloorStoreActions = (set, get) => ({
         currentFloorId: legacyFloor.id,
         objects: cloneObjects(legacyFloor.objects),
         selectedObjectId: null,
+        ...resetEditorHistoryState,
       })
       return
     }
@@ -1490,6 +1619,8 @@ export const createFloorStoreActions = (set, get) => ({
       canvasZoom: firstFloor.canvasZoom,
       canvasPosition: firstFloor.canvasPosition,
       selectedObjectId: null,
+      ...resetEditorHistoryState,
     })
   },
-})
+  }
+}
