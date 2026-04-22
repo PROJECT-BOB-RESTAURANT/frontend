@@ -16,6 +16,7 @@ Current capabilities:
 - Dedicated workers management page where restaurant workers are assigned from searchable system users.
 - Multi-restaurant management with isolated data contexts.
 - Per-restaurant floor management and canvas editing.
+- Floor editor undo/redo controls with keyboard shortcuts (`Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z`, `Ctrl/Cmd+Y`).
 - Table metadata with seat counts and labels.
 - Waiter table management (orders + reservations + occupancy + bill settlement).
 - Staff kitchen touchscreen workflow (incoming queue, color-coded statuses, timing panel).
@@ -188,6 +189,7 @@ Layout flow:
 Technical notes:
 - Canvas interactions are handled through `dnd-kit`.
 - Grid snapping and zoom/position are managed via store state.
+- Undo/redo history is scoped to the active editor workspace and resets on floor/workspace changes.
 
 ## 4.4 Waiter Flow
 
@@ -204,7 +206,9 @@ Status behavior:
 Current implemented rules:
 - Default reservation duration: 3 hours when end time is omitted or invalid.
 - Reservation party size is clamped to minimum 1.
-- Multiple reservations can exist per table.
+- Multiple reservations can exist per table only when time windows do not overlap.
+- Reservation create requests are rejected when the selected date is closed or outside the effective opening hours (date override first, weekly fallback).
+- Overnight opening windows are supported, so reservations can cross midnight when the full range is inside the configured open interval (for example `22:00` to `04:00`).
 - Reservation timeline can be inspected per selected day.
 - Manual occupancy can be set, extended, and cleared.
 

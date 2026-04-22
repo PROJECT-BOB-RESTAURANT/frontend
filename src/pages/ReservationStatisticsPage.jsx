@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { backendApi } from '../services/backendApi'
-import { toDateMs } from '../utils/reservations'
+import { toDateMs, validateReservationWithinOpeningHours } from '../utils/reservations'
 import { readPaymentEvents } from '../utils/paymentEvents'
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -13,12 +13,6 @@ const toDateInputValue = (date) => {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
-}
-
-const toDateKeyFromValue = (value) => {
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return null
-  return toDateInputValue(parsed)
 }
 
 const toDateTimeLocal = (value) => {
@@ -152,8 +146,15 @@ function ReservationStatisticsPage({
     const openMinutes = toMinutes(openingEntry.open)
     const closeMinutes = toMinutes(openingEntry.close)
 
-    if (openMinutes === null || closeMinutes === null || closeMinutes <= openMinutes) {
+    if (openMinutes === null || closeMinutes === null || openMinutes === closeMinutes) {
       return [{ leftPct: 0, widthPct: 100 }]
+    }
+
+    if (closeMinutes < openMinutes) {
+      return [{
+        leftPct: (closeMinutes / (24 * 60)) * 100,
+        widthPct: ((openMinutes - closeMinutes) / (24 * 60)) * 100,
+      }]
     }
 
     const openPct = (openMinutes / (24 * 60)) * 100
@@ -440,45 +441,27 @@ function ReservationStatisticsPage({
       return
     }
 
-    const startDateKey = toDateKeyFromValue(reservationStart)
-    const endDateKey = toDateKeyFromValue(reservationEnd)
+    const startMs = toDateMs(reservationStart)
+    const endMs = toDateMs(reservationEnd)
 
-    if (!startDateKey || !endDateKey) {
+    if (startMs === null || endMs === null) {
       setFeedback('Reservation start and end must be valid datetime values.')
       return
     }
 
-    if (startDateKey !== endDateKey) {
-      setFeedback('Reservation must start and end on the same day.')
-      return
-    }
-
-    const startMinutes = toMinutes(String(reservationStart).slice(11, 16))
-    const endMinutes = toMinutes(String(reservationEnd).slice(11, 16))
-    if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
+    if (endMs <= startMs) {
       setFeedback('Reservation end time must be after start time.')
       return
     }
 
-    const effective = getEffectiveOpeningForDate(startDateKey, openingSource, openingOverrideSource)
-    const effectiveEntry = effective.entry
-
-    if (!effectiveEntry || effectiveEntry.isClosed) {
-      setFeedback('Restaurant is closed for the selected reservation date.')
-      return
-    }
-
-    const openMinutes = toMinutes(effectiveEntry.open)
-    const closeMinutes = toMinutes(effectiveEntry.close)
-
-    if (
-      openMinutes === null
-      || closeMinutes === null
-      || closeMinutes <= openMinutes
-      || startMinutes < openMinutes
-      || endMinutes > closeMinutes
-    ) {
-      setFeedback(`Reservation must be within opening hours: ${effectiveEntry.open} - ${effectiveEntry.close}.`)
+    const openingValidation = validateReservationWithinOpeningHours(
+      reservationStart,
+      reservationEnd,
+      openingSource,
+      openingOverrideSource,
+    )
+    if (!openingValidation.isValid) {
+      setFeedback(openingValidation.message)
       return
     }
 
@@ -673,7 +656,11 @@ function ReservationStatisticsPage({
           </section>
         ) : null}
 
-        {feedback ? <p className="mb-3 text-xs text-slate-600">{feedback}</p> : null}
+        {feedback ? (
+          <div className="mb-4 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-800 shadow-sm">
+            {feedback}
+          </div>
+        ) : null}
 
         {floorsWithTables.length === 0 ? (
           <article className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">

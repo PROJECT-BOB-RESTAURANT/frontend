@@ -291,8 +291,15 @@ export const WaiterPanel = () => {
     const openMinutes = toMinutes(entry.open)
     const closeMinutes = toMinutes(entry.close)
 
-    if (openMinutes === null || closeMinutes === null || closeMinutes <= openMinutes) {
+    if (openMinutes === null || closeMinutes === null || openMinutes === closeMinutes) {
       return [{ leftPct: 0, widthPct: 100 }]
+    }
+
+    if (closeMinutes < openMinutes) {
+      return [{
+        leftPct: (closeMinutes / (24 * 60)) * 100,
+        widthPct: ((openMinutes - closeMinutes) / (24 * 60)) * 100,
+      }]
     }
 
     const openPct = (openMinutes / (24 * 60)) * 100
@@ -326,7 +333,7 @@ export const WaiterPanel = () => {
     if (entry.isClosed) return true
     const openMinutes = toMinutes(entry.open)
     const closeMinutes = toMinutes(entry.close)
-    return openMinutes === null || closeMinutes === null || closeMinutes <= openMinutes
+    return openMinutes === null || closeMinutes === null || openMinutes === closeMinutes
   }, [selectedDayOpening])
 
   const refreshTableData = async () => {
@@ -648,7 +655,11 @@ export const WaiterPanel = () => {
           </button>
         </div>
 
-        {feedback ? <p className="mb-3 text-xs text-slate-600">{feedback}</p> : null}
+        {feedback ? (
+          <div className="mb-4 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-800 shadow-sm">
+            {feedback}
+          </div>
+        ) : null}
 
         {activeSection === 'reservations' ? (
           <div className="rounded-xl border border-slate-200 bg-white p-4">
