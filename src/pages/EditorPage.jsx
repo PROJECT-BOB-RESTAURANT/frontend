@@ -308,7 +308,7 @@ function EditorPage({
                 : `minmax(0, 1fr) 10px ${inspectorHeight}px`,
           }}
         >
-          {!isStaff && editorMode === 'edit' ? <ObjectLibrary role={role} /> : null}
+          {!isStaff && editorMode === 'edit' ? <ObjectLibrary /> : null}
           <CanvasEditor />
           <div className="relative flex h-full items-stretch justify-center bg-slate-100/80 max-lg:h-full max-lg:w-full">
             <button
