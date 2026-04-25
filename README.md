@@ -2,7 +2,7 @@
 
 Restaurant Floor Planner is a React + Vite app that combines floor-layout design, waiter table operations, and guest booking in one interface.
 
-The current build is frontend-first (Zustand in-memory state), structured so backend APIs can be introduced incrementally.
+The app uses Zustand for client-side workspace state and syncs persisted data through backend APIs.
 
 ## 1. Product Snapshot
 
@@ -16,13 +16,10 @@ Current capabilities:
 - Dedicated workers management page where restaurant workers are assigned from searchable system users.
 - Multi-restaurant management with isolated data contexts.
 - Per-restaurant floor management and canvas editing.
-<<<<<<< HEAD
 - Floor editor undo/redo controls with keyboard shortcuts (`Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z`, `Ctrl/Cmd+Y`).
-=======
 - Scoped JSON portability tools:
 	- admin-only floor-plan JSON import/export in Floor Manager
 	- admin-only full-restaurant JSON import/export in Restaurant Management
->>>>>>> ab71399bb7b76a6b15f48722c7d11d8b3277ff2d
 - Table metadata with seat counts and labels.
 - Waiter table management (orders + reservations + occupancy + bill settlement).
 - Staff kitchen touchscreen workflow (incoming queue, color-coded statuses, timing panel).
@@ -224,7 +221,7 @@ Current implemented rules:
 
 ## 5. Options Available in the UI
 
-## 5.0 Authentication Options
+## 5.1 Authentication Options
 
 From login page:
 - Sign in with username and password
@@ -257,7 +254,7 @@ Admin-only pre-page:
 - Opening-hours changes are persisted with the `Save Opening Hours` button.
 - If backend user lookup fails for an old username after account changes, sign out and sign back in to refresh the stored auth session/JWT identity.
 
-## 5.1 Restaurant Management Options
+## 5.2 Restaurant Management Options
 
 From restaurants view:
 - Add restaurant
@@ -298,7 +295,7 @@ From workers page:
 - Update assigned worker role
 - Remove worker from restaurant
 
-## 5.2 Floor and Editor Options
+## 5.3 Floor and Editor Options
 
 From floor management:
 - Open floor in view mode
@@ -339,7 +336,7 @@ Keyboard shortcuts:
 - `Delete` or `Backspace`: delete selected object
 - `Ctrl/Cmd + D`: duplicate selected object
 
-## 5.3 Waiter Options
+## 5.4 Waiter Options
 
 Order operations:
 - Add custom order line
@@ -365,7 +362,7 @@ Reservation operations:
 - Clear manual occupancy
 - View day timeline with current-time marker
 
-## 5.4 Kitchen Options
+## 5.5 Kitchen Options
 
 Kitchen operations:
 - View active kitchen queue in incoming order
@@ -374,7 +371,7 @@ Kitchen operations:
 - Auto-hide served lines from active queue (with optional served toggle)
 - Inspect per-ticket timing stats (queue, in progress, prep, waiting for server, total)
 
-## 5.5 Reservation Statistics Options
+## 5.6 Reservation Statistics Options
 
 Reservation statistics operations:
 - Select restaurant and day
@@ -384,7 +381,7 @@ Reservation statistics operations:
 - Track paid income and tip totals from settled payments
 - Track cash vs card usage (amount and usage count)
 
-## 5.4 Guest Reservation Options
+## 5.7 Guest Reservation Options
 
 Guest page options:
 - Select restaurant/floor/table

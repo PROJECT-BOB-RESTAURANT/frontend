@@ -68,6 +68,5 @@ export const appendPaymentEvent = (event) => {
   try {
     window.localStorage.setItem(PAYMENT_EVENTS_STORAGE_KEY, JSON.stringify(next))
   } catch {
-    // Ignore storage failures and keep settlement flow uninterrupted.
   }
 }
