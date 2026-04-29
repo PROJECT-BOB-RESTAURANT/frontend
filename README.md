@@ -71,6 +71,12 @@ If not set, it defaults to `/api/v1`.
 
 In development, Vite proxies `/api/*` to `http://localhost:8080`.
 
+### Default users to use for demo:
+
+danrolls - Secret123 - STAFF
+nat20chris - Secret123 - MANAGER
+platform.admin - Secret123 - ADMIN
+
 ## 3. Current Uses
 
 ## 3.1 Planning Workflow
