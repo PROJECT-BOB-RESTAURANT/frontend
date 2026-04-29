@@ -40,8 +40,51 @@ import {
   persistRestaurantFloors,
   updateCurrentRestaurant,
 } from './workspaceHelpers'
+import {
+  applyEditorSnapshot,
+  createEditorSnapshot,
+  EDITOR_HISTORY_LIMIT,
+  isSameEditorSnapshot,
+  isSnapshotForCurrentWorkspace,
+} from './history'
 
-export const createFloorStoreActions = (set, get) => ({
+export const createFloorStoreActions = (set, get) => {
+  const resetEditorHistoryState = {
+    editorUndoStack: [],
+    editorRedoStack: [],
+  }
+
+  const isEditorHistoryTrackable = (state) =>
+    state.page === 'editor'
+    && Boolean(state.currentRestaurantId)
+    && Boolean(state.currentFloorId)
+
+  const recordEditorSnapshot = () => {
+    const snapshot = createEditorSnapshot(get())
+
+    set((state) => {
+      if (!isEditorHistoryTrackable(state)) {
+        return {}
+      }
+
+      const lastSnapshot = state.editorUndoStack[state.editorUndoStack.length - 1] ?? null
+      if (lastSnapshot && isSameEditorSnapshot(lastSnapshot, snapshot)) {
+        return {}
+      }
+
+      const nextUndoStack = [...state.editorUndoStack, snapshot]
+      if (nextUndoStack.length > EDITOR_HISTORY_LIMIT) {
+        nextUndoStack.shift()
+      }
+
+      return {
+        editorUndoStack: nextUndoStack,
+        editorRedoStack: [],
+      }
+    })
+  }
+
+  return {
   setSnapEnabled: (enabled) => set({ snapEnabled: Boolean(enabled) }),
   setSelectedObject: (id) => set({ selectedObjectId: id }),
 
@@ -349,6 +392,7 @@ export const createFloorStoreActions = (set, get) => ({
         page: 'editor',
         waiterTableId: null,
         waiterWorkerId: null,
+        ...resetEditorHistoryState,
       }
     })
   },
@@ -360,6 +404,7 @@ export const createFloorStoreActions = (set, get) => ({
       selectedObjectId: null,
       waiterTableId: null,
       waiterWorkerId: null,
+      ...resetEditorHistoryState,
     }))
   },
 
@@ -436,6 +481,7 @@ export const createFloorStoreActions = (set, get) => ({
         editorMode: mode,
         waiterTableId: null,
         waiterWorkerId: null,
+        ...resetEditorHistoryState,
       }
     })
   },
@@ -447,23 +493,89 @@ export const createFloorStoreActions = (set, get) => ({
       selectedObjectId: null,
       waiterTableId: null,
       waiterWorkerId: null,
+      ...resetEditorHistoryState,
     }))
   },
 
   switchFloorInEditor: (floorId) => {
     set((state) => {
       const persistedFloors = persistCurrentFloor(state)
-      return loadFloorIntoEditor(
+      const nextState = loadFloorIntoEditor(
         {
           ...state,
           floors: persistedFloors,
         },
         floorId,
       )
+
+      return {
+        ...nextState,
+        ...resetEditorHistoryState,
+      }
     })
   },
 
   setEditorMode: (mode) => set({ editorMode: mode }),
+
+  undoEditorChange: () => {
+    set((state) => {
+      if (!isEditorHistoryTrackable(state) || state.editorUndoStack.length === 0) {
+        return {}
+      }
+
+      const previousSnapshot = state.editorUndoStack[state.editorUndoStack.length - 1]
+      if (!isSnapshotForCurrentWorkspace(previousSnapshot, state)) {
+        return {
+          ...resetEditorHistoryState,
+        }
+      }
+
+      const currentSnapshot = createEditorSnapshot(state)
+      const nextUndoStack = state.editorUndoStack.slice(0, -1)
+      const nextRedoStack = [currentSnapshot, ...state.editorRedoStack]
+      if (nextRedoStack.length > EDITOR_HISTORY_LIMIT) {
+        nextRedoStack.pop()
+      }
+
+      const nextState = applyEditorSnapshot(state, previousSnapshot)
+      return {
+        ...nextState,
+        editorUndoStack: nextUndoStack,
+        editorRedoStack: nextRedoStack,
+      }
+    })
+  },
+
+  redoEditorChange: () => {
+    set((state) => {
+      if (!isEditorHistoryTrackable(state) || state.editorRedoStack.length === 0) {
+        return {}
+      }
+
+      const nextSnapshot = state.editorRedoStack[0]
+      if (!isSnapshotForCurrentWorkspace(nextSnapshot, state)) {
+        return {
+          ...resetEditorHistoryState,
+        }
+      }
+
+      const currentSnapshot = createEditorSnapshot(state)
+      const nextRedoStack = state.editorRedoStack.slice(1)
+      const nextUndoStack = [...state.editorUndoStack, currentSnapshot]
+      if (nextUndoStack.length > EDITOR_HISTORY_LIMIT) {
+        nextUndoStack.shift()
+      }
+
+      const nextState = applyEditorSnapshot(state, nextSnapshot)
+      return {
+        ...nextState,
+        editorUndoStack: nextUndoStack,
+        editorRedoStack: nextRedoStack,
+      }
+    })
+  },
+
+  clearEditorHistory: () => set({ ...resetEditorHistoryState }),
 
   setReservationPreviewAt: (value) => {
     const normalizedValue = typeof value === 'string' ? value.trim() : ''
@@ -544,6 +656,7 @@ export const createFloorStoreActions = (set, get) => ({
       waiterWorkerId: fallbackWorkerId,
       waiterActiveSection: section === 'reservations' ? 'reservations' : 'orders',
       selectedObjectId: tableId,
+      ...resetEditorHistoryState,
     })
   },
 
@@ -554,6 +667,7 @@ export const createFloorStoreActions = (set, get) => ({
       waiterTableId: null,
       waiterWorkerId: null,
       waiterActiveSection: 'orders',
+      ...resetEditorHistoryState,
     })
   },
 
@@ -1074,6 +1188,8 @@ export const createFloorStoreActions = (set, get) => ({
   },
 
   addObjectFromPreset: (preset, x, y) => {
+    recordEditorSnapshot()
+
     const snapEnabled = get().snapEnabled
     const object = normalizeObject({
       ...preset.config,
@@ -1090,6 +1206,8 @@ export const createFloorStoreActions = (set, get) => ({
   },
 
   updateObject: (id, updates) => {
+    recordEditorSnapshot()
+
     const snapEnabled = get().snapEnabled
     const normalizedUpdates = { ...updates }
 
@@ -1177,6 +1295,8 @@ export const createFloorStoreActions = (set, get) => ({
     const selectedObjectId = get().selectedObjectId
     if (!selectedObjectId) return
 
+    recordEditorSnapshot()
+
     set((state) => ({
       objects: state.objects.filter((obj) => obj.id !== selectedObjectId),
       selectedObjectId: null,
@@ -1191,6 +1311,8 @@ export const createFloorStoreActions = (set, get) => ({
 
     const source = get().objects.find((obj) => obj.id === selectedObjectId)
     if (!source) return
+
+    recordEditorSnapshot()
 
     const duplicated = normalizeObject({
       ...source,
@@ -1209,7 +1331,10 @@ export const createFloorStoreActions = (set, get) => ({
     }))
   },
 
-  setCanvasZoom: (zoom) => set({ canvasZoom: clamp(zoom, MIN_ZOOM, MAX_ZOOM) }),
+  setCanvasZoom: (zoom) => {
+    recordEditorSnapshot()
+    set({ canvasZoom: clamp(zoom, MIN_ZOOM, MAX_ZOOM) })
+  },
 
   panCanvasBy: (dx, dy) => {
     set((state) => ({
@@ -1243,6 +1368,7 @@ export const createFloorStoreActions = (set, get) => ({
           waiterTableId: null,
           waiterWorkerId: null,
           page: options.page ?? 'restaurant-management',
+          ...resetEditorHistoryState,
         }
       }
 
@@ -1306,6 +1432,7 @@ export const createFloorStoreActions = (set, get) => ({
         waiterTableId: waiterTableExists ? options.waiterTableId : null,
         waiterWorkerId: options.waiterWorkerId ?? state.waiterWorkerId,
         selectedObjectId: selectedObjectExists ? options.selectedObjectId : null,
+        ...resetEditorHistoryState,
       }
     })
   },
@@ -1338,6 +1465,7 @@ export const createFloorStoreActions = (set, get) => ({
         objects: state.objects.map(remapObject),
         selectedObjectId: nextSelectedObjectId,
         waiterTableId: nextWaiterTableId,
+        ...resetEditorHistoryState,
       }
     })
   },
@@ -1370,29 +1498,23 @@ export const createFloorStoreActions = (set, get) => ({
     })
   },
 
-  exportLayout: () => {
+  exportFloorPlanJson: (restaurantId = null) => {
     const state = get()
-    const persistedFloors = persistCurrentFloor(state)
-    const restaurant = state.restaurants.find((item) => item.id === state.currentRestaurantId)
+    const targetRestaurantId = restaurantId ?? state.currentRestaurantId
+    const persistedRestaurants = persistCurrentRestaurant(state)
+    const restaurant = persistedRestaurants.find((item) => item.id === targetRestaurantId)
+    const floors = restaurant?.floors ?? []
 
     return JSON.stringify(
       {
-        restaurant: restaurant
-          ? {
-              id: restaurant.id,
-              name: restaurant.name,
-              workers: normalizeWorkers(restaurant.workers),
-              goodsCatalog: normalizeMenuFolders(restaurant.goodsCatalog ?? restaurant.goodsCategories),
-              openingHours: normalizeOpeningHours(restaurant.openingHours),
-              openingDateOverrides: normalizeOpeningDateOverrides(restaurant.openingDateOverrides),
-            }
-          : null,
-        floors: persistedFloors.map((floor) => ({
+        floors: floors.map((floor) => ({
           id: floor.id,
           name: floor.name,
           size: floor.size ?? null,
           createdAt: floor.createdAt,
           updatedAt: floor.updatedAt,
+          canvasZoom: floor.canvasZoom ?? DEFAULT_CANVAS_ZOOM,
+          canvasPosition: floor.canvasPosition ?? { ...DEFAULT_CANVAS_POSITION },
           objects: floor.objects.map((obj) => ({
             id: obj.id,
             type: obj.type,
@@ -1414,82 +1536,192 @@ export const createFloorStoreActions = (set, get) => ({
     )
   },
 
-  loadLayout: (payload) => {
+  exportRestaurantJson: (restaurantId = null) => {
+    const state = get()
+    const targetRestaurantId = restaurantId ?? state.currentRestaurantId
+    const persistedRestaurants = persistCurrentRestaurant(state)
+    const restaurant = persistedRestaurants.find((item) => item.id === targetRestaurantId)
+    const floors = restaurant?.floors ?? []
+
+    return JSON.stringify(
+      {
+        restaurant: restaurant
+          ? {
+              id: restaurant.id,
+              name: restaurant.name,
+              workers: normalizeWorkers(restaurant.workers),
+              goodsCatalog: normalizeMenuFolders(restaurant.goodsCatalog ?? restaurant.goodsCategories),
+              openingHours: normalizeOpeningHours(restaurant.openingHours),
+              openingDateOverrides: normalizeOpeningDateOverrides(restaurant.openingDateOverrides),
+            }
+          : null,
+        floors: floors.map((floor) => ({
+          id: floor.id,
+          name: floor.name,
+          size: floor.size ?? null,
+          createdAt: floor.createdAt,
+          updatedAt: floor.updatedAt,
+          canvasZoom: floor.canvasZoom ?? DEFAULT_CANVAS_ZOOM,
+          canvasPosition: floor.canvasPosition ?? { ...DEFAULT_CANVAS_POSITION },
+          objects: floor.objects.map((obj) => ({
+            id: obj.id,
+            type: obj.type,
+            x: obj.x,
+            y: obj.y,
+            width: obj.width,
+            height: obj.height,
+            rotation: obj.rotation,
+            scaleX: obj.scaleX,
+            scaleY: obj.scaleY,
+            seats: obj.metadata?.seats ?? 0,
+            label: obj.metadata?.label ?? '',
+            metadata: obj.metadata,
+          })),
+        })),
+      },
+      null,
+      2,
+    )
+  },
+
+  loadFloorPlanJson: (payload, restaurantId = null) => {
     const parsed = JSON.parse(payload)
 
-    if (Array.isArray(parsed.objects)) {
-      const legacyFloor = createFloorModel('Imported Floor')
-      legacyFloor.objects = parsed.objects.map((obj) => normalizeObject(obj))
-      legacyFloor.updatedAt = Date.now()
+    set((state) => {
+      const targetRestaurantId = restaurantId ?? state.currentRestaurantId
+      if (!targetRestaurantId) {
+        throw new Error('No restaurant selected.')
+      }
 
-      const state = get()
-      const restaurants = persistRestaurantFloors(
-        state.restaurants,
-        state.currentRestaurantId,
-        [legacyFloor],
-      )
+      let parsedFloors = parsed.floors
 
-      set({
+      if (Array.isArray(parsed.objects)) {
+        const legacyFloor = createFloorModel('Imported Floor')
+        legacyFloor.objects = parsed.objects.map((obj) => normalizeObject(obj))
+        legacyFloor.updatedAt = Date.now()
+        parsedFloors = [legacyFloor]
+      }
+
+      if (!Array.isArray(parsedFloors)) {
+        throw new Error('Layout JSON must include a floors array')
+      }
+
+      const importedFloors = parsedFloors.map((floor, index) => ({
+        id: floor.id ?? createId('floor'),
+        name: floor.name ?? `Floor ${index + 1}`,
+        size: floor.size ?? null,
+        createdAt: floor.createdAt ?? Date.now(),
+        updatedAt: Date.now(),
+        canvasZoom: floor.canvasZoom ?? DEFAULT_CANVAS_ZOOM,
+        canvasPosition: floor.canvasPosition ?? { ...DEFAULT_CANVAS_POSITION },
+        objects: Array.isArray(floor.objects) ? floor.objects.map((obj) => normalizeObject(obj)) : [],
+      }))
+
+      const persistedRestaurants = persistCurrentRestaurant(state)
+      const existingFloors =
+        persistedRestaurants.find((restaurant) => restaurant.id === targetRestaurantId)?.floors ?? []
+      const mergedFloorMap = new Map(existingFloors.map((floor) => [floor.id, floor]))
+
+      for (const importedFloor of importedFloors) {
+        mergedFloorMap.set(importedFloor.id, importedFloor)
+      }
+
+      const mergedFloors = Array.from(mergedFloorMap.values())
+      const fallbackFloor = existingFloors[0] ?? createFloorModel('Ground Floor')
+      const nextSelectedFloor = importedFloors[0] ?? fallbackFloor
+      const restaurants = persistRestaurantFloors(persistedRestaurants, targetRestaurantId, mergedFloors)
+
+      if (state.currentRestaurantId !== targetRestaurantId) {
+        return { restaurants }
+      }
+
+      return {
         restaurants,
-        floors: [legacyFloor],
-        currentFloorId: legacyFloor.id,
-        objects: cloneObjects(legacyFloor.objects),
+        floors: mergedFloors.length > 0 ? mergedFloors : [fallbackFloor],
+        currentFloorId: nextSelectedFloor.id,
+        objects: cloneObjects(nextSelectedFloor.objects),
+        canvasZoom: nextSelectedFloor.canvasZoom,
+        canvasPosition: nextSelectedFloor.canvasPosition,
         selectedObjectId: null,
-      })
-      return
-    }
-
-    if (!Array.isArray(parsed.floors)) {
-      throw new Error('Layout JSON must include a floors array')
-    }
-
-    const floors = parsed.floors.map((floor, index) => ({
-      id: floor.id ?? createId('floor'),
-      name: floor.name ?? `Floor ${index + 1}`,
-      size: floor.size ?? null,
-      createdAt: floor.createdAt ?? Date.now(),
-      updatedAt: Date.now(),
-      canvasZoom: floor.canvasZoom ?? DEFAULT_CANVAS_ZOOM,
-      canvasPosition: floor.canvasPosition ?? { ...DEFAULT_CANVAS_POSITION },
-      objects: Array.isArray(floor.objects)
-        ? floor.objects.map((obj) => normalizeObject(obj))
-        : [],
-    }))
-
-    const firstFloor = floors[0] ?? createFloorModel('Ground Floor')
-
-    const state = get()
-    const restaurants = persistRestaurantFloors(state.restaurants, state.currentRestaurantId, floors).map(
-      (restaurant) => {
-        if (restaurant.id !== state.currentRestaurantId) return restaurant
-
-        return {
-          ...restaurant,
-          workers: normalizeWorkers(parsed.restaurant?.workers ?? restaurant.workers),
-          goodsCatalog: normalizeMenuFolders(
-            parsed.restaurant?.goodsCatalog ??
-              parsed.restaurant?.goodsCategories ??
-              restaurant.goodsCatalog ??
-              restaurant.goodsCategories,
-          ),
-          openingHours: normalizeOpeningHours(
-            parsed.restaurant?.openingHours ?? restaurant.openingHours,
-          ),
-          openingDateOverrides: normalizeOpeningDateOverrides(
-            parsed.restaurant?.openingDateOverrides ?? restaurant.openingDateOverrides,
-          ),
-        }
-      },
-    )
-
-    set({
-      restaurants,
-      floors: floors.length > 0 ? floors : [firstFloor],
-      currentFloorId: firstFloor.id,
-      objects: cloneObjects(firstFloor.objects),
-      canvasZoom: firstFloor.canvasZoom,
-      canvasPosition: firstFloor.canvasPosition,
-      selectedObjectId: null,
+        ...resetEditorHistoryState,
+      }
     })
   },
-})
+
+  loadRestaurantJson: (payload, restaurantId = null) => {
+    const parsed = JSON.parse(payload)
+
+    set((state) => {
+      const targetRestaurantId = restaurantId ?? state.currentRestaurantId
+      if (!targetRestaurantId) {
+        throw new Error('No restaurant selected.')
+      }
+
+      let parsedFloors = parsed.floors
+
+      if (Array.isArray(parsed.objects)) {
+        const legacyFloor = createFloorModel('Imported Floor')
+        legacyFloor.objects = parsed.objects.map((obj) => normalizeObject(obj))
+        legacyFloor.updatedAt = Date.now()
+        parsedFloors = [legacyFloor]
+      }
+
+      if (!Array.isArray(parsedFloors)) {
+        throw new Error('Layout JSON must include a floors array')
+      }
+
+      const floors = parsedFloors.map((floor, index) => ({
+        id: floor.id ?? createId('floor'),
+        name: floor.name ?? `Floor ${index + 1}`,
+        size: floor.size ?? null,
+        createdAt: floor.createdAt ?? Date.now(),
+        updatedAt: Date.now(),
+        canvasZoom: floor.canvasZoom ?? DEFAULT_CANVAS_ZOOM,
+        canvasPosition: floor.canvasPosition ?? { ...DEFAULT_CANVAS_POSITION },
+        objects: Array.isArray(floor.objects) ? floor.objects.map((obj) => normalizeObject(obj)) : [],
+      }))
+
+      const firstFloor = floors[0] ?? createFloorModel('Ground Floor')
+      const persistedRestaurants = persistCurrentRestaurant(state)
+      const restaurants = persistRestaurantFloors(persistedRestaurants, targetRestaurantId, floors).map(
+        (restaurant) => {
+          if (restaurant.id !== targetRestaurantId) return restaurant
+
+          return {
+            ...restaurant,
+            name: parsed.restaurant?.name ?? restaurant.name,
+            workers: normalizeWorkers(parsed.restaurant?.workers ?? restaurant.workers),
+            goodsCatalog: normalizeMenuFolders(
+              parsed.restaurant?.goodsCatalog ??
+                parsed.restaurant?.goodsCategories ??
+                restaurant.goodsCatalog ??
+                restaurant.goodsCategories,
+            ),
+            openingHours: normalizeOpeningHours(parsed.restaurant?.openingHours ?? restaurant.openingHours),
+            openingDateOverrides: normalizeOpeningDateOverrides(
+              parsed.restaurant?.openingDateOverrides ?? restaurant.openingDateOverrides,
+            ),
+          }
+        },
+      )
+
+      if (state.currentRestaurantId !== targetRestaurantId) {
+        return { restaurants }
+      }
+
+      return {
+        restaurants,
+        floors: floors.length > 0 ? floors : [firstFloor],
+        currentFloorId: firstFloor.id,
+        objects: cloneObjects(firstFloor.objects),
+        canvasZoom: firstFloor.canvasZoom,
+        canvasPosition: firstFloor.canvasPosition,
+        selectedObjectId: null,
+      }
+    })
+  },
+
+  exportLayout: (restaurantId = null) => get().exportRestaurantJson(restaurantId),
+  loadLayout: (payload, restaurantId = null) => get().loadRestaurantJson(payload, restaurantId),
+  }
+}

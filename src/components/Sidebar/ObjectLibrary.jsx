@@ -2,9 +2,8 @@ import { OBJECT_LIBRARY } from '../../utils/objectLibrary'
 import { isTableObjectType } from '../../utils/objectLibrary'
 import { useFloorStore } from '../../store/useFloorStore'
 import { LibraryItem } from './LibraryItem'
-import { useState } from 'react'
 
-export const ObjectLibrary = ({ role }) => {
+export const ObjectLibrary = () => {
   const selectedObject = useFloorStore((state) =>
     state.objects.find((item) => item.id === state.selectedObjectId) ?? null,
   )
@@ -13,53 +12,7 @@ export const ObjectLibrary = ({ role }) => {
   const duplicateSelectedObject = useFloorStore((state) => state.duplicateSelectedObject)
   const snapEnabled = useFloorStore((state) => state.snapEnabled)
   const setSnapEnabled = useFloorStore((state) => state.setSnapEnabled)
-  const exportLayout = useFloorStore((state) => state.exportLayout)
-  const loadLayout = useFloorStore((state) => state.loadLayout)
-
-  const [layoutText, setLayoutText] = useState('')
-  const [layoutFeedback, setLayoutFeedback] = useState('')
   const isTable = selectedObject ? isTableObjectType(selectedObject.type) : false
-  const isAdmin = role === 'ADMIN'
-
-  const downloadLayout = () => {
-    const data = exportLayout()
-    const blob = new Blob([data], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `floor-layout-${Date.now()}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-    setLayoutFeedback('Exported JSON file.')
-  }
-
-  const saveLayout = () => {
-    const data = exportLayout()
-    localStorage.setItem('floor-layout', data)
-    setLayoutText(data)
-    setLayoutFeedback('Saved to browser storage.')
-  }
-
-  const loadSavedLayout = () => {
-    const saved = localStorage.getItem('floor-layout')
-    if (!saved) {
-      setLayoutFeedback('No saved layout found.')
-      return
-    }
-
-    loadLayout(saved)
-    setLayoutText(saved)
-    setLayoutFeedback('Loaded saved layout.')
-  }
-
-  const importLayout = () => {
-    try {
-      loadLayout(layoutText)
-      setLayoutFeedback('Imported layout JSON.')
-    } catch (error) {
-      setLayoutFeedback(error.message)
-    }
-  }
 
   return (
     <aside className="flex h-full flex-col overflow-hidden border-r border-slate-200 bg-white/70 backdrop-blur">
@@ -247,55 +200,6 @@ export const ObjectLibrary = ({ role }) => {
           )}
         </div>
 
-        {isAdmin ? (
-          <div className="rounded-xl border border-slate-200 bg-white p-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Floor Settings
-            </h3>
-
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                className="min-h-10 rounded-md bg-sky-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-sky-500"
-                onClick={saveLayout}
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                className="min-h-10 rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
-                onClick={loadSavedLayout}
-              >
-                Load
-              </button>
-              <button
-                type="button"
-                className="min-h-10 rounded-md bg-indigo-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500"
-                onClick={downloadLayout}
-              >
-                Export
-              </button>
-              <button
-                type="button"
-                className="min-h-10 rounded-md bg-amber-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-amber-500"
-                onClick={importLayout}
-              >
-                Import
-              </button>
-            </div>
-
-            <textarea
-              className="mt-2 h-28 w-full rounded-md border border-slate-200 p-2 text-xs"
-              placeholder="Paste layout JSON here to import..."
-              value={layoutText}
-              onChange={(event) => setLayoutText(event.target.value)}
-            />
-
-            {layoutFeedback ? (
-              <p className="mt-1 text-[11px] text-slate-500">{layoutFeedback}</p>
-            ) : null}
-          </div>
-        ) : null}
         </div>
       </div>
     </aside>

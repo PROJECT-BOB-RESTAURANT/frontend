@@ -2,25 +2,30 @@
 
 Restaurant Floor Planner is a React + Vite app that combines floor-layout design, waiter table operations, and guest booking in one interface.
 
-The current build is frontend-first (Zustand in-memory state), structured so backend APIs can be introduced incrementally.
+The app uses Zustand for client-side workspace state and syncs persisted data through backend APIs.
 
 ## 1. Product Snapshot
 
 Current capabilities:
 - Default login page with account sign-in.
 - Admin-only pre-page with entry options for user management and restaurant management.
+- Admin user management with create/list/search/edit/delete flows, including self-delete prevention for the currently logged-in account.
 - Simplified restaurant list cards with a single `Manage Restaurant` action.
 - Sectioned restaurant management hub with dedicated `Restaurant Management`, `Floor Manager`, and `Staff Manager` areas.
 - Fixed user status widget (bottom-left) showing current username and role, with hide and logout actions.
 - Dedicated workers management page where restaurant workers are assigned from searchable system users.
 - Multi-restaurant management with isolated data contexts.
 - Per-restaurant floor management and canvas editing.
+- Floor editor undo/redo controls with keyboard shortcuts (`Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z`, `Ctrl/Cmd+Y`).
+- Scoped JSON portability tools:
+	- admin-only floor-plan JSON import/export in Floor Manager
+	- admin-only full-restaurant JSON import/export in Restaurant Management
 - Table metadata with seat counts and labels.
-- Waiter table management (orders + reservations + occupancy).
+- Waiter table management (orders + reservations + occupancy + bill settlement).
 - Staff kitchen touchscreen workflow (incoming queue, color-coded statuses, timing panel).
 - Reservation statistics page with per-floor/per-table occupancy timelines and direct reservation creation.
-- Manager analytics cards in reservation statistics for served income, open ticket value, reservation totals, active reservations, and floor-level reservation breakdown.
-- Analytics diagrams in reservation statistics for revenue split and per-floor reservation distribution.
+- Manager analytics cards in reservation statistics for paid income, tip totals, open ticket value, reservation totals, active reservations, and floor-level reservation breakdown.
+- Analytics diagrams in reservation statistics for cash-vs-card usage and per-floor reservation distribution.
 - Floor-wide reservation action that reserves all tables on a selected floor for the same customer and time window.
 - Guest reservation flow (restaurant -> floor -> table -> booking).
 - Restaurant operations setup (workers, opening hours, nested menu catalog).
@@ -95,7 +100,9 @@ Use waiter mode for in-service table operations:
 2. Add catalog or custom order items.
 3. Set worker attribution.
 4. Add reservations or manual occupancy.
-5. Monitor timeline and table status.
+5. Configure payment (cash/card, optional tip, split bill).
+6. Settle bill to clear paid order(s) and remove active reservation(s) on the table.
+7. Monitor timeline and table status.
 
 Use reservation statistics for floor-level booking blocks:
 1. Open reservation statistics.
@@ -186,16 +193,21 @@ Layout flow:
 2. Drag object preset from library to canvas.
 3. Move/resize/rotate objects.
 4. Edit metadata in inspector (including table seats).
-5. Export/import floor data as needed.
+5. Save layout to backend from editor when table IDs must be persisted.
+
+JSON import/export flow:
+- Floor Manager page: import/export floor-plan JSON without overriding restaurant-level data; imported floors are persisted to backend during import.
+- Restaurant Management page: import/export full restaurant JSON including restaurant details and floors.
 
 Technical notes:
 - Canvas interactions are handled through `dnd-kit`.
 - Grid snapping and zoom/position are managed via store state.
+- Undo/redo history is scoped to the active editor workspace and resets on floor/workspace changes.
 
 ## 4.4 Waiter Flow
 
 Waiter panel has two operation sections:
-- `orders`: add catalog/custom items, adjust qty/status/price, assign worker.
+- `orders`: add catalog/custom items, adjust qty/status/price, assign worker, and settle payments (cash/card, optional tip, split bill).
 - `reservations`: add/remove/extend reservations, manual occupancy control, timeline view.
 
 Status behavior:
@@ -207,17 +219,20 @@ Status behavior:
 Current implemented rules:
 - Default reservation duration: 3 hours when end time is omitted or invalid.
 - Reservation party size is clamped to minimum 1.
-- Multiple reservations can exist per table.
+- Multiple reservations can exist per table only when time windows do not overlap.
+- Reservation create requests are rejected when the selected date is closed or outside the effective opening hours (date override first, weekly fallback).
+- Overnight opening windows are supported, so reservations can cross midnight when the full range is inside the configured open interval (for example `22:00` to `04:00`).
 - Reservation timeline can be inspected per selected day.
 - Manual occupancy can be set, extended, and cleared.
 
 ## 5. Options Available in the UI
 
-## 5.0 Authentication Options
+## 5.1 Authentication Options
 
 From login page:
 - Sign in with username and password
 - Continue to management pages after successful authentication
+- Admin access is granted to any authenticated user that has backend role `ADMIN` (not tied to a fixed username).
 
 From authenticated pages:
 - See active username and role in the bottom-left user status widget
@@ -225,12 +240,17 @@ From authenticated pages:
 - For admins in restaurant flow: return to admin pre-page using the `Admin` button in the user status widget
 
 Admin-only pre-page:
-- `Manage Users`: open admin user creation screen
+- `Manage Users`: open admin user management screen (create user with actual name + username, search users, edit actual name/username/role, delete user)
 - `Manage Restaurants`: continue to restaurant list and operations
 
 ### Backend Integration Notes
 
 - Restaurant and floor create/rename/delete operations are connected to backend endpoints.
+- Admin user-management operations are connected to backend auth endpoints:
+- `POST /auth/register` (create user with `name`, `username`, `password`, `role`)
+- `GET /auth/users` (list/search users)
+- `PATCH /auth/users/{id}` (update name/username/role)
+- `DELETE /auth/users/{id}` (delete user)
 - Worker and menu-folder/menu-item management is connected to backend endpoints.
 - Guest reservations are created through backend reservation endpoints.
 - Waiter orders and reservations are loaded and persisted through backend table/order/reservation endpoints.
@@ -238,12 +258,14 @@ Admin-only pre-page:
 - Table-level backend calls only run for persisted table UUIDs; unsaved local table IDs are blocked in frontend with a save-layout message.
 - Floor planner now refreshes reservation data for all tables on the current floor after backend hydration and restaurant/floor switch, so free/reserved colors stay in sync after user changes.
 - Opening-hours changes are persisted with the `Save Opening Hours` button.
+- If backend user lookup fails for an old username after account changes, sign out and sign back in to refresh the stored auth session/JWT identity.
 
-## 5.1 Restaurant Management Options
+## 5.2 Restaurant Management Options
 
 From restaurants view:
 - Add restaurant
 - Open selected restaurant via `Manage Restaurant`
+- For admins: import/export full restaurant JSON from the `Restaurant JSON` section
 
 From restaurant management hub (`Restaurant Management` section):
 - Open kitchen
@@ -253,6 +275,9 @@ From restaurant management hub (`Restaurant Management` section):
 From restaurant management hub (`Admin Buttons` section):
 - Rename restaurant
 - Delete restaurant
+
+From restaurant management hub (`Floor Manager` section):
+- Import/export floor-plan JSON from the `Floor Plan JSON` section
 
 From restaurant management hub (`Floor Manager` section):
 - Add floor
@@ -276,12 +301,13 @@ From workers page:
 - Update assigned worker role
 - Remove worker from restaurant
 
-## 5.2 Floor and Editor Options
+## 5.3 Floor and Editor Options
 
 From floor management:
 - Open floor in view mode
 - Open floor in edit mode
 - For manager/admin: add floor, rename floor, delete floor
+- For admins: export/import floor-plan JSON in the `Floor Plan JSON` section
 
 From editor:
 - Switch edit/view mode
@@ -290,7 +316,7 @@ From editor:
 - Edit object dimensions and metadata
 - Set table seats
 - Toggle snapping
-- Export and import floor data (admin only)
+- Save current floor layout to backend
 
 Confirmation dialogs:
 - Delete restaurant requires explicit confirmation.
@@ -307,7 +333,7 @@ Floor planner UX behavior:
 - Floor planner toolbar includes a `Time` selector to preview table free/reserved colors at any chosen datetime
 - Floor planner `Time` includes `-` and `+` step buttons (30 minutes) for quick backward/forward availability preview
 - Floor viewer toolbar includes a `Restore View` button to instantly return canvas zoom and position to centered defaults
-- JSON layout tools are visible only for admin users
+- Floor-plan JSON tools are shown in Floor Manager for admins only (not in editor side panels)
 - Staff users in planner view only get table service actions (no object data editing panels), including `Manage Table` and `Manage Reservation` when selecting a table
 - Manager and admin can place new library elements in both edit mode and table/view mode
 - Planner side panels use larger widths/heights for easier touch navigation
@@ -316,7 +342,7 @@ Keyboard shortcuts:
 - `Delete` or `Backspace`: delete selected object
 - `Ctrl/Cmd + D`: duplicate selected object
 
-## 5.3 Waiter Options
+## 5.4 Waiter Options
 
 Order operations:
 - Add custom order line
@@ -327,6 +353,10 @@ Order operations:
 - Assign worker
 - Remove order line
 - Clear all table orders
+- Settle bill with cash or card
+- Add optional tip during settlement
+- Split bill across multiple guests with per-split amount and method
+- On settlement, clear active reservations for the table
 - Receive ready-to-serve notifications for own placed orders with item and table/floor context
 
 Reservation operations:
@@ -338,7 +368,7 @@ Reservation operations:
 - Clear manual occupancy
 - View day timeline with current-time marker
 
-## 5.4 Kitchen Options
+## 5.5 Kitchen Options
 
 Kitchen operations:
 - View active kitchen queue in incoming order
@@ -347,15 +377,17 @@ Kitchen operations:
 - Auto-hide served lines from active queue (with optional served toggle)
 - Inspect per-ticket timing stats (queue, in progress, prep, waiting for server, total)
 
-## 5.5 Reservation Statistics Options
+## 5.6 Reservation Statistics Options
 
 Reservation statistics operations:
 - Select restaurant and day
 - Inspect occupancy timeline for each table grouped by floor
 - View closed (non-operating) periods directly on timelines
 - Add reservation directly from any table timeline row
+- Track paid income and tip totals from settled payments
+- Track cash vs card usage (amount and usage count)
 
-## 5.4 Guest Reservation Options
+## 5.7 Guest Reservation Options
 
 Guest page options:
 - Select restaurant/floor/table

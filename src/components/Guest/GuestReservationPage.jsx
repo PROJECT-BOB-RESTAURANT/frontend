@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useFloorStore } from '../../store/useFloorStore'
 import { isTableObjectType } from '../../utils/objectLibrary'
+import { toDateMs, validateReservationWithinOpeningHours } from '../../utils/reservations'
 import { backendApi } from '../../services/backendApi'
-
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 const toDateTimeLocal = (date) => {
   const year = date.getFullYear()
@@ -14,38 +13,6 @@ const toDateTimeLocal = (date) => {
   return `${year}-${month}-${day}T${hour}:${minute}`
 }
 
-const toMinutes = (timeValue) => {
-  const text = String(timeValue ?? '').trim()
-  const match = text.match(/^(\d{2}):(\d{2})$/)
-  if (!match) return null
-  const hour = Number(match[1])
-  const minute = Number(match[2])
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null
-  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null
-  return hour * 60 + minute
-}
-
-const toDateKey = (value) => {
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return null
-  const year = parsed.getFullYear()
-  const month = String(parsed.getMonth() + 1).padStart(2, '0')
-  const day = String(parsed.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-const getEffectiveOpeningForDate = (dateKey, weeklyEntries, overrideEntries) => {
-  const weekly = Array.isArray(weeklyEntries) ? weeklyEntries : []
-  const overrides = Array.isArray(overrideEntries) ? overrideEntries : []
-
-  const override = overrides.find((entry) => entry.date === dateKey) ?? null
-  if (override) return override
-
-  const parsed = new Date(`${dateKey}T00:00`)
-  if (Number.isNaN(parsed.getTime())) return null
-  const dayName = DAY_NAMES[parsed.getDay()]
-  return weekly.find((entry) => entry.day === dayName) ?? null
-}
 
 export const GuestReservationPage = () => {
   const restaurants = useFloorStore((state) => state.restaurants)
@@ -73,6 +40,7 @@ export const GuestReservationPage = () => {
   })
   const [note, setNote] = useState('')
   const [feedback, setFeedback] = useState('')
+  const [feedbackKind, setFeedbackKind] = useState('neutral')
 
   const selectedRestaurant = useMemo(
     () => restaurants.find((restaurant) => restaurant.id === restaurantId) ?? null,
@@ -106,53 +74,41 @@ export const GuestReservationPage = () => {
   }, [floorId, tables])
 
   const submitReservation = () => {
+    const setErrorFeedback = (message) => {
+      setFeedbackKind('error')
+      setFeedback(message)
+    }
+
+    const setSuccessFeedback = (message) => {
+      setFeedbackKind('success')
+      setFeedback(message)
+    }
+
     if (!restaurantId || !floorId || !tableId) {
-      setFeedback('Please select restaurant, floor, and table.')
+      setErrorFeedback('Please select restaurant, floor, and table.')
       return
     }
 
-    const startDateKey = toDateKey(startAt)
-    const endDateKey = toDateKey(endAt)
-    if (!startDateKey || !endDateKey) {
-      setFeedback('Please provide valid reservation start and end values.')
+    const startMs = toDateMs(startAt)
+    const endMs = toDateMs(endAt)
+    if (startMs === null || endMs === null) {
+      setErrorFeedback('Please provide valid reservation start and end values.')
       return
     }
 
-    if (startDateKey !== endDateKey) {
-      setFeedback('Reservation must start and end on the same day.')
+    if (endMs <= startMs) {
+      setErrorFeedback('Reservation end time must be after start time.')
       return
     }
 
-    const startMinutes = toMinutes(String(startAt).slice(11, 16))
-    const endMinutes = toMinutes(String(endAt).slice(11, 16))
-    if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
-      setFeedback('Reservation end time must be after start time.')
-      return
-    }
-
-    const effectiveOpening = getEffectiveOpeningForDate(
-      startDateKey,
+    const openingValidation = validateReservationWithinOpeningHours(
+      startAt,
+      endAt,
       selectedRestaurant?.openingHours,
       selectedRestaurant?.openingDateOverrides,
     )
-
-    if (!effectiveOpening || effectiveOpening.isClosed) {
-      setFeedback('Restaurant is closed for the selected reservation date.')
-      return
-    }
-
-    const openMinutes = toMinutes(effectiveOpening.open)
-    const closeMinutes = toMinutes(effectiveOpening.close)
-    if (
-      openMinutes === null
-      || closeMinutes === null
-      || closeMinutes <= openMinutes
-      || startMinutes < openMinutes
-      || endMinutes > closeMinutes
-    ) {
-      setFeedback(
-        `Reservation must be within opening hours: ${effectiveOpening.open} - ${effectiveOpening.close}.`,
-      )
+    if (!openingValidation.isValid) {
+      setErrorFeedback(openingValidation.message)
       return
     }
 
@@ -178,13 +134,13 @@ export const GuestReservationPage = () => {
           selectedObjectId,
         })
 
-        setFeedback('Reservation created successfully.')
+        setSuccessFeedback('Reservation created successfully.')
         setGuestName('')
         setPartySize('2')
         setNote('')
       })
       .catch((error) => {
-        setFeedback(error.message)
+        setErrorFeedback(`Could not create reservation: ${error.message}`)
       })
       .finally(() => {
         setIsSaving(false)
@@ -312,7 +268,7 @@ export const GuestReservationPage = () => {
           </label>
         </div>
 
-        <div className="mt-4 flex items-center gap-2">
+        <div className="mt-4 space-y-3">
           <button
             type="button"
             className="rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500"
@@ -322,7 +278,19 @@ export const GuestReservationPage = () => {
             {isSaving ? 'Saving...' : 'Create Reservation'}
           </button>
 
-          {feedback ? <p className="text-xs text-slate-600">{feedback}</p> : null}
+          {feedback ? (
+            <div
+              className={`rounded-lg border px-3 py-2 text-sm font-semibold shadow-sm ${
+                feedbackKind === 'error'
+                  ? 'border-rose-300 bg-rose-50 text-rose-800'
+                  : feedbackKind === 'success'
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                    : 'border-slate-300 bg-slate-50 text-slate-700'
+              }`}
+            >
+              {feedback}
+            </div>
+          ) : null}
         </div>
       </section>
     </main>

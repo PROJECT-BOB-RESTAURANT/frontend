@@ -3,9 +3,14 @@ import { useFloorStore } from '../../store/useFloorStore'
 import { getActiveReservation, isTableReservedNow, toDateMs } from '../../utils/reservations'
 import { backendApi } from '../../services/backendApi'
 import { FRONTEND_ORDER_LINE_STATUSES, orderLineStatusLabel } from '../../utils/orderLineStatus'
+import { appendPaymentEvent } from '../../utils/paymentEvents'
 
 const ORDER_STATUS_OPTIONS = FRONTEND_ORDER_LINE_STATUSES.filter((status) => status !== 'void')
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const PAYMENT_METHODS = [
+  { value: 'cash', label: 'Cash' },
+  { value: 'card', label: 'Card' },
+]
 
 const findFolderByPath = (folders, pathIds) => {
   let currentFolders = folders
@@ -92,6 +97,14 @@ export const WaiterPanel = () => {
   const [feedback, setFeedback] = useState('')
   const [savedOpeningHours, setSavedOpeningHours] = useState([])
   const [savedOpeningDateOverrides, setSavedOpeningDateOverrides] = useState([])
+  const [paymentMode, setPaymentMode] = useState('single')
+  const [singlePaymentMethod, setSinglePaymentMethod] = useState('card')
+  const [splitCount, setSplitCount] = useState(2)
+  const [splitPayments, setSplitPayments] = useState([
+    { amount: '', method: 'cash' },
+    { amount: '', method: 'card' },
+  ])
+  const [tipAmount, setTipAmount] = useState('')
 
   const orders = table?.metadata?.orders ?? []
   const reservations = (table?.metadata?.reservations ?? []).slice().sort((a, b) => {
@@ -134,6 +147,12 @@ export const WaiterPanel = () => {
       ),
     [orders],
   )
+  const normalizedTipAmount = useMemo(() => {
+    const parsed = Number(tipAmount)
+    if (!Number.isFinite(parsed)) return 0
+    return Math.max(0, parsed)
+  }, [tipAmount])
+  const totalWithTip = useMemo(() => totalPrice + normalizedTipAmount, [totalPrice, normalizedTipAmount])
   const tableName = table?.metadata?.label ?? table?.type ?? 'Table'
   const seats = Math.max(1, Math.round(Number(table?.metadata?.seats ?? 1)))
   const activeReservation = getActiveReservation(table?.metadata)
@@ -141,6 +160,36 @@ export const WaiterPanel = () => {
   const manualOccupiedUntilMs = toDateMs(table?.metadata?.manualOccupiedUntil)
   const hasManualOccupancy =
     manualOccupiedUntilMs !== null && manualOccupiedUntilMs > Date.now()
+
+  const normalizedSplitCount = useMemo(() => {
+    const numeric = Number(splitCount)
+    if (!Number.isFinite(numeric)) return 2
+    return Math.max(2, Math.min(12, Math.round(numeric)))
+  }, [splitCount])
+
+  const equalSplitAmount = useMemo(() => {
+    if (normalizedSplitCount <= 0) return 0
+    return totalWithTip / normalizedSplitCount
+  }, [normalizedSplitCount, totalWithTip])
+
+  const splitTotals = useMemo(() => {
+    const amounts = splitPayments.slice(0, normalizedSplitCount).map((entry) => {
+      const parsed = Number(entry.amount)
+      if (Number.isFinite(parsed) && parsed >= 0) {
+        return parsed
+      }
+      return equalSplitAmount
+    })
+
+    const total = amounts.reduce((sum, amount) => sum + amount, 0)
+    const difference = totalWithTip - total
+
+    return {
+      amounts,
+      total,
+      difference,
+    }
+  }, [splitPayments, normalizedSplitCount, equalSplitAmount, totalWithTip])
 
   const dayWindow = useMemo(() => {
     const parsed = timelineDate ? new Date(`${timelineDate}T00:00`) : new Date()
@@ -242,8 +291,15 @@ export const WaiterPanel = () => {
     const openMinutes = toMinutes(entry.open)
     const closeMinutes = toMinutes(entry.close)
 
-    if (openMinutes === null || closeMinutes === null || closeMinutes <= openMinutes) {
+    if (openMinutes === null || closeMinutes === null || openMinutes === closeMinutes) {
       return [{ leftPct: 0, widthPct: 100 }]
+    }
+
+    if (closeMinutes < openMinutes) {
+      return [{
+        leftPct: (closeMinutes / (24 * 60)) * 100,
+        widthPct: ((openMinutes - closeMinutes) / (24 * 60)) * 100,
+      }]
     }
 
     const openPct = (openMinutes / (24 * 60)) * 100
@@ -277,7 +333,7 @@ export const WaiterPanel = () => {
     if (entry.isClosed) return true
     const openMinutes = toMinutes(entry.open)
     const closeMinutes = toMinutes(entry.close)
-    return openMinutes === null || closeMinutes === null || closeMinutes <= openMinutes
+    return openMinutes === null || closeMinutes === null || openMinutes === closeMinutes
   }, [selectedDayOpening])
 
   const refreshTableData = async () => {
@@ -326,6 +382,16 @@ export const WaiterPanel = () => {
   useEffect(() => {
     setWaiterWorker(currentWorkerId)
   }, [setWaiterWorker, currentWorkerId])
+
+  useEffect(() => {
+    setSplitPayments((previous) => {
+      const next = previous.slice(0, normalizedSplitCount)
+      while (next.length < normalizedSplitCount) {
+        next.push({ amount: '', method: 'cash' })
+      }
+      return next
+    })
+  }, [normalizedSplitCount])
 
   const runMutation = async (operation, successMessage) => {
     setIsSaving(true)
@@ -425,6 +491,119 @@ export const WaiterPanel = () => {
     )
   }
 
+  const settleBill = () => {
+    if (orders.length === 0) {
+      setFeedback('No order lines to settle.')
+      return
+    }
+
+    if (paymentMode === 'split' && Math.abs(splitTotals.difference) > 0.01) {
+      setFeedback('Split amounts must sum to the full table total before settling.')
+      return
+    }
+
+    const uniqueOrderIds = [...new Set(orders.map((order) => order.tableOrderId).filter(Boolean))]
+    if (uniqueOrderIds.length === 0) {
+      setFeedback('No persisted table order found to settle.')
+      return
+    }
+
+    const now = Date.now()
+    const activeReservationIds = reservations
+      .filter((reservation) => {
+        const startMs = toDateMs(reservation.startAt)
+        const endMs = toDateMs(reservation.endAt)
+        return startMs !== null && endMs !== null && startMs <= now && now < endMs
+      })
+      .map((reservation) => reservation.id)
+
+    const splitSummary = splitPayments
+      .slice(0, normalizedSplitCount)
+      .map((entry, index) => {
+        const amount = splitTotals.amounts[index] ?? 0
+        const methodLabel = PAYMENT_METHODS.find((option) => option.value === entry.method)?.label ?? 'Cash'
+        return `${methodLabel} $${amount.toFixed(2)}`
+      })
+      .join(' | ')
+
+    const singleAmount = totalWithTip
+    const splitEntries = splitPayments.slice(0, normalizedSplitCount)
+    const methodBreakdown = splitEntries.reduce(
+      (accumulator, entry, index) => {
+        const amount = splitTotals.amounts[index] ?? 0
+        if (entry.method === 'card') {
+          accumulator.card += amount
+        } else {
+          accumulator.cash += amount
+        }
+        return accumulator
+      },
+      { cash: 0, card: 0 },
+    )
+    const methodUsageCount = splitEntries.reduce(
+      (accumulator, entry) => {
+        if (entry.method === 'card') {
+          accumulator.card += 1
+        } else {
+          accumulator.cash += 1
+        }
+        return accumulator
+      },
+      { cash: 0, card: 0 },
+    )
+
+    if (paymentMode === 'single') {
+      if (singlePaymentMethod === 'card') {
+        methodBreakdown.card = singleAmount
+        methodBreakdown.cash = 0
+        methodUsageCount.card = 1
+        methodUsageCount.cash = 0
+      } else {
+        methodBreakdown.cash = singleAmount
+        methodBreakdown.card = 0
+        methodUsageCount.cash = 1
+        methodUsageCount.card = 0
+      }
+    }
+
+    const paymentSummary =
+      paymentMode === 'single'
+        ? `via ${singlePaymentMethod.toUpperCase()}`
+        : `${normalizedSplitCount} splits (${splitSummary})`
+
+    const reservationSummary =
+      activeReservationIds.length > 0
+        ? ` Active reservations cleared: ${activeReservationIds.length}.`
+        : ''
+
+    runMutation(
+      () =>
+        Promise.all(
+          [
+            ...uniqueOrderIds.map((orderId) =>
+            backendApi.deleteTableOrder(currentRestaurantId, waiterTableId, orderId),
+            ),
+            ...activeReservationIds.map((reservationId) =>
+              backendApi.deleteReservation(currentRestaurantId, reservationId),
+            ),
+          ],
+        ).then(() => {
+          appendPaymentEvent({
+            restaurantId: currentRestaurantId,
+            tableId: waiterTableId,
+            amount: totalPrice,
+            tipAmount: normalizedTipAmount,
+            method: paymentMode === 'single' ? singlePaymentMethod : 'split',
+            splitCount: paymentMode === 'split' ? normalizedSplitCount : 1,
+            methodBreakdown,
+            methodUsageCount,
+            settledBy: currentWorkerName ?? '',
+          })
+        }),
+      `Bill settled ${paymentSummary}.${reservationSummary}`,
+    )
+  }
+
   if (!waiterTableId || !table) {
     return (
       <main className="min-h-screen bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-6">
@@ -476,7 +655,11 @@ export const WaiterPanel = () => {
           </button>
         </div>
 
-        {feedback ? <p className="mb-3 text-xs text-slate-600">{feedback}</p> : null}
+        {feedback ? (
+          <div className="mb-4 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-800 shadow-sm">
+            {feedback}
+          </div>
+        ) : null}
 
         {activeSection === 'reservations' ? (
           <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -740,6 +923,168 @@ export const WaiterPanel = () => {
 
         {activeSection === 'orders' ? (
           <>
+        <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Payment</h2>
+            <p className="text-xs text-slate-500">
+              Subtotal: ${totalPrice.toFixed(2)} | Tip: ${normalizedTipAmount.toFixed(2)} | Due: ${totalWithTip.toFixed(2)}
+            </p>
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <label className="text-xs font-semibold text-slate-600">Tip</label>
+            <input
+              className="w-28 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+              type="number"
+              min="0"
+              step="0.01"
+              value={tipAmount}
+              onChange={(event) => setTipAmount(event.target.value)}
+              placeholder="0.00"
+            />
+            <button
+              type="button"
+              className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200"
+              onClick={() => setTipAmount((totalPrice * 0.1).toFixed(2))}
+            >
+              +10%
+            </button>
+            <button
+              type="button"
+              className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200"
+              onClick={() => setTipAmount((totalPrice * 0.15).toFixed(2))}
+            >
+              +15%
+            </button>
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold ${paymentMode === 'single' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+              onClick={() => setPaymentMode('single')}
+            >
+              Single Payment
+            </button>
+            <button
+              type="button"
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold ${paymentMode === 'split' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+              onClick={() => setPaymentMode('split')}
+            >
+              Split Bill
+            </button>
+          </div>
+
+          {paymentMode === 'single' ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <label className="text-xs font-semibold text-slate-600">Method</label>
+              <select
+                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                value={singlePaymentMethod}
+                onChange={(event) => setSinglePaymentMethod(event.target.value)}
+              >
+                {PAYMENT_METHODS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="mt-3 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-xs font-semibold text-slate-600">Split count</label>
+                <input
+                  className="w-20 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                  type="number"
+                  min="2"
+                  max="12"
+                  step="1"
+                  value={splitCount}
+                  onChange={(event) => setSplitCount(event.target.value)}
+                />
+                <span className="text-[11px] text-slate-500">
+                  Equal split default: ${equalSplitAmount.toFixed(2)} / person
+                </span>
+              </div>
+
+              <div className="grid gap-2 md:grid-cols-2">
+                {splitPayments.slice(0, normalizedSplitCount).map((entry, index) => (
+                  <div key={`split-${index}`} className="rounded-md border border-slate-200 bg-slate-50 p-2">
+                    <p className="text-[11px] font-semibold text-slate-600">Guest {index + 1}</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <input
+                        className="w-24 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder={equalSplitAmount.toFixed(2)}
+                        value={entry.amount}
+                        onChange={(event) =>
+                          setSplitPayments((previous) =>
+                            previous.map((item, itemIndex) =>
+                              itemIndex === index ? { ...item, amount: event.target.value } : item,
+                            ),
+                          )
+                        }
+                      />
+                      <select
+                        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                        value={entry.method}
+                        onChange={(event) =>
+                          setSplitPayments((previous) =>
+                            previous.map((item, itemIndex) =>
+                              itemIndex === index ? { ...item, method: event.target.value } : item,
+                            ),
+                          )
+                        }
+                      >
+                        {PAYMENT_METHODS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <p className={`text-[11px] ${Math.abs(splitTotals.difference) > 0.01 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                Split total: ${splitTotals.total.toFixed(2)} | Remaining: ${splitTotals.difference.toFixed(2)}
+              </p>
+            </div>
+          )}
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={settleBill}
+              disabled={isSaving || orders.length === 0}
+            >
+              Settle Bill
+            </button>
+            <button
+              type="button"
+              className="rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={() => {
+                setPaymentMode('single')
+                setSinglePaymentMethod('card')
+                setSplitCount(2)
+                setSplitPayments([
+                  { amount: '', method: 'cash' },
+                  { amount: '', method: 'card' },
+                ])
+                setTipAmount('')
+              }}
+              disabled={isSaving}
+            >
+              Reset Payment Form
+            </button>
+          </div>
+        </div>
+
         <div className="mb-4 flex justify-end">
           <button
             type="button"

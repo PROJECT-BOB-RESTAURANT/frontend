@@ -40,9 +40,12 @@ function EditorPage({
   onSetEditorMode,
 }) {
   const isStaff = role === 'STAFF'
-  const isAdmin = role === 'ADMIN'
   const reservationPreviewAt = useFloorStore((state) => state.reservationPreviewAt)
   const setReservationPreviewAt = useFloorStore((state) => state.setReservationPreviewAt)
+  const undoEditorChange = useFloorStore((state) => state.undoEditorChange)
+  const redoEditorChange = useFloorStore((state) => state.redoEditorChange)
+  const canUndo = useFloorStore((state) => state.editorUndoStack.length > 0)
+  const canRedo = useFloorStore((state) => state.editorRedoStack.length > 0)
   const [statusTimeInput, setStatusTimeInput] = useState(() => toDateTimeLocalInput(reservationPreviewAt))
   const [inspectorWidth, setInspectorWidth] = useState(() => {
     const stored = Number(localStorage.getItem('editor-inspector-width'))
@@ -236,6 +239,24 @@ function EditorPage({
             <div className="ml-auto flex flex-wrap gap-2">
               <button
                 type="button"
+                className="min-h-11 rounded-md bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={undoEditorChange}
+                disabled={!canUndo}
+                title="Undo (Ctrl/Cmd+Z)"
+              >
+                Undo
+              </button>
+              <button
+                type="button"
+                className="min-h-11 rounded-md bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={redoEditorChange}
+                disabled={!canRedo}
+                title="Redo (Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y)"
+              >
+                Redo
+              </button>
+              <button
+                type="button"
                 className="min-h-11 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={isBackendLoading}
                 onClick={onSaveCurrentFloorLayout}
@@ -287,7 +308,7 @@ function EditorPage({
                 : `minmax(0, 1fr) 10px ${inspectorHeight}px`,
           }}
         >
-          {!isStaff && editorMode === 'edit' ? <ObjectLibrary role={role} /> : null}
+          {!isStaff && editorMode === 'edit' ? <ObjectLibrary /> : null}
           <CanvasEditor />
           <div className="relative flex h-full items-stretch justify-center bg-slate-100/80 max-lg:h-full max-lg:w-full">
             <button
