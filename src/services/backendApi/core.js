@@ -1,5 +1,5 @@
 const API_HOST = String(import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
-const API_BASE = `${API_HOST}/api`.replace(/\/$/, '')
+const API_BASE = `${API_HOST}/api/v1`.replace(/\/$/, '')
 const AUTH_STORAGE_KEY = 'bob.auth.session'
 
 const extractEnvelopeData = (payload) => {
