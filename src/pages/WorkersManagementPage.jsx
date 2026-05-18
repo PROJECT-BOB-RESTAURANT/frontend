@@ -102,7 +102,7 @@ function WorkersManagementPage({
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-6">
+    <main className="min-h-screen bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-4 sm:p-6">
       <section className="mx-auto max-w-5xl rounded-2xl border border-white/70 bg-white/75 p-6 shadow-2xl backdrop-blur">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -167,7 +167,7 @@ function WorkersManagementPage({
               {availableUsers.map((user) => (
                 <div
                   key={user.id}
-                  className="grid grid-cols-[1fr_120px_auto] items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-2"
+                  className="grid grid-cols-1 gap-2 rounded-md border border-slate-200 bg-slate-50 p-2 sm:grid-cols-[1fr_120px_auto] sm:items-center"
                 >
                   <div>
                     <p className="text-sm font-semibold text-slate-800">{user.username}</p>
@@ -213,7 +213,7 @@ function WorkersManagementPage({
               {workers.map((worker) => (
                 <div
                   key={worker.id}
-                  className="grid grid-cols-[1fr_120px_auto] items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-2"
+                  className="grid grid-cols-1 gap-2 rounded-md border border-slate-200 bg-slate-50 p-2 sm:grid-cols-[1fr_120px_auto] sm:items-center"
                 >
                   <div>
                     <p className="text-sm font-semibold text-slate-800">{worker.name}</p>

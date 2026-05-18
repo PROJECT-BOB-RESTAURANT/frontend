@@ -510,7 +510,7 @@ function ReservationStatisticsPage({
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-6">
+    <main className="min-h-screen bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-4 sm:p-6">
       <section className="mx-auto max-w-7xl rounded-2xl border border-white/70 bg-white/80 p-6 shadow-2xl backdrop-blur">
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <button
@@ -717,7 +717,7 @@ function ReservationStatisticsPage({
                       value={reservationNote}
                       onChange={(event) => setReservationNote(event.target.value)}
                     />
-                    <div className="md:col-span-2 flex gap-2">
+                    <div className="md:col-span-2 flex flex-wrap gap-2">
                       <button
                         type="button"
                         className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
@@ -852,7 +852,7 @@ function ReservationStatisticsPage({
                               value={reservationNote}
                               onChange={(event) => setReservationNote(event.target.value)}
                             />
-                            <div className="md:col-span-2 flex gap-2">
+                            <div className="md:col-span-2 flex flex-wrap gap-2">
                               <button
                                 type="button"
                                 className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"

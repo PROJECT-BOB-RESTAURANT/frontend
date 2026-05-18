@@ -148,9 +148,9 @@ export const GuestReservationPage = () => {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-6">
+    <main className="min-h-screen bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-4 sm:p-6">
       <section className="mx-auto max-w-3xl rounded-2xl border border-white/70 bg-white/80 p-6 shadow-2xl backdrop-blur">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-extrabold text-slate-800">Guest Reservation</h1>
             <p className="text-sm text-slate-500">
@@ -159,7 +159,7 @@ export const GuestReservationPage = () => {
           </div>
           <button
             type="button"
-            className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
+            className="w-full rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 sm:w-auto"
             onClick={backToRestaurantManagement}
           >
             Back

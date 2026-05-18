@@ -60,6 +60,7 @@ function KitchenPage() {
   const [feedback, setFeedback] = useState('')
   const [selectedLineId, setSelectedLineId] = useState(null)
   const [includeServed, setIncludeServed] = useState(false)
+  const [isMobileDetailsOpen, setIsMobileDetailsOpen] = useState(false)
 
   const tableLookup = useMemo(() => {
     const byTableId = new Map()
@@ -163,6 +164,40 @@ function KitchenPage() {
     }
   }, [selectedLine])
 
+  const detailsPanel = (
+    <aside className="rounded-xl border border-slate-200 bg-white p-4">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Ticket Time Manager</h2>
+      {selectedLine && lineTimings ? (
+        <div className="mt-3 space-y-2">
+          <p className="text-sm font-bold text-slate-800">{selectedLine.name}</p>
+          <p className="text-xs text-slate-500">{orderLineStatusLabel(selectedLine.status)}</p>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Queued Before Work</p>
+            <p className="text-lg font-bold text-slate-800">{toDurationText(lineTimings.queuedDuration)}</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">In Progress</p>
+            <p className="text-lg font-bold text-slate-800">{toDurationText(lineTimings.inProgressDuration)}</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">In Prep</p>
+            <p className="text-lg font-bold text-slate-800">{toDurationText(lineTimings.inPrepDuration)}</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ready Waiting For Server</p>
+            <p className="text-lg font-bold text-slate-800">{toDurationText(lineTimings.waitingDuration)}</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-sky-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Total Ticket Time</p>
+            <p className="text-xl font-extrabold text-sky-900">{toDurationText(lineTimings.totalDuration)}</p>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-slate-500">Select a ticket to view detailed timing stats.</p>
+      )}
+    </aside>
+  )
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-4 sm:p-6">
       <section className="mx-auto max-w-7xl rounded-2xl border border-white/70 bg-white/80 p-4 shadow-2xl backdrop-blur sm:p-6">
@@ -203,6 +238,14 @@ function KitchenPage() {
             disabled={isLoading}
           >
             {isLoading ? 'Refreshing...' : 'Refresh'}
+          </button>
+
+          <button
+            type="button"
+            className="min-h-11 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 lg:hidden"
+            onClick={() => setIsMobileDetailsOpen(true)}
+          >
+            Ticket Manager
           </button>
         </div>
 
@@ -284,38 +327,32 @@ function KitchenPage() {
             )}
           </section>
 
-          <aside className="rounded-xl border border-slate-200 bg-white p-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Ticket Time Manager</h2>
-            {selectedLine && lineTimings ? (
-              <div className="mt-3 space-y-2">
-                <p className="text-sm font-bold text-slate-800">{selectedLine.name}</p>
-                <p className="text-xs text-slate-500">{orderLineStatusLabel(selectedLine.status)}</p>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Queued Before Work</p>
-                  <p className="text-lg font-bold text-slate-800">{toDurationText(lineTimings.queuedDuration)}</p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">In Progress</p>
-                  <p className="text-lg font-bold text-slate-800">{toDurationText(lineTimings.inProgressDuration)}</p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">In Prep</p>
-                  <p className="text-lg font-bold text-slate-800">{toDurationText(lineTimings.inPrepDuration)}</p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ready Waiting For Server</p>
-                  <p className="text-lg font-bold text-slate-800">{toDurationText(lineTimings.waitingDuration)}</p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-sky-50 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Total Ticket Time</p>
-                  <p className="text-xl font-extrabold text-sky-900">{toDurationText(lineTimings.totalDuration)}</p>
-                </div>
-              </div>
-            ) : (
-              <p className="mt-3 text-sm text-slate-500">Select a ticket to view detailed timing stats.</p>
-            )}
-          </aside>
+          <div className="hidden lg:block">{detailsPanel}</div>
         </div>
+
+        {isMobileDetailsOpen ? (
+          <div
+            className="fixed inset-0 z-50 flex items-end bg-slate-900/40 lg:hidden"
+            onClick={() => setIsMobileDetailsOpen(false)}
+          >
+            <div
+              className="h-[75vh] w-full overflow-hidden rounded-t-2xl border border-slate-200 bg-white"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                <span className="text-sm font-semibold text-slate-700">Ticket Manager</span>
+                <button
+                  type="button"
+                  className="rounded-md bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700"
+                  onClick={() => setIsMobileDetailsOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+              <div className="h-[calc(75vh-52px)] overflow-y-auto p-4">{detailsPanel}</div>
+            </div>
+          </div>
+        ) : null}
       </section>
     </main>
   )

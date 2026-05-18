@@ -148,9 +148,9 @@ function AdminUsersPage({ onBack }) {
   }
 
   return (
-    <main className="grid min-h-full place-items-center bg-slate-100 p-6">
+    <main className="grid min-h-full place-items-center bg-slate-100 p-4 sm:p-6">
       <section className="w-full max-w-4xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-5 flex items-center justify-between gap-3">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Admin Control</p>
             <h1 className="mt-1 text-2xl font-bold text-slate-900">Manage Users</h1>
@@ -241,14 +241,14 @@ function AdminUsersPage({ onBack }) {
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Users</h2>
 
             <form
-              className="mt-3 flex gap-2"
+              className="mt-3 flex flex-wrap gap-2"
               onSubmit={(event) => {
                 event.preventDefault()
                 loadUsers(search)
               }}
             >
               <input
-                className="h-10 flex-1 rounded-lg border border-slate-300 px-3 outline-none ring-orange-200 transition focus:border-orange-500 focus:ring-2"
+                className="h-10 min-w-[180px] flex-1 rounded-lg border border-slate-300 px-3 outline-none ring-orange-200 transition focus:border-orange-500 focus:ring-2"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search users"

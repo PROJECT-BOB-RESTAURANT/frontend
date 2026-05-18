@@ -1,6 +1,6 @@
 function AdminHomePage({ onManageUsers, onManageRestaurants }) {
   return (
-    <main className="grid min-h-full place-items-center bg-slate-100 p-6">
+    <main className="grid min-h-full place-items-center bg-slate-100 p-4 sm:p-6">
       <section className="w-full max-w-4xl">
         <header className="mb-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Admin Control</p>

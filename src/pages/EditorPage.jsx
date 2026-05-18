@@ -47,6 +47,8 @@ function EditorPage({
   const canUndo = useFloorStore((state) => state.editorUndoStack.length > 0)
   const canRedo = useFloorStore((state) => state.editorRedoStack.length > 0)
   const [statusTimeInput, setStatusTimeInput] = useState(() => toDateTimeLocalInput(reservationPreviewAt))
+  const [isMobileLibraryOpen, setIsMobileLibraryOpen] = useState(false)
+  const [isMobileInspectorOpen, setIsMobileInspectorOpen] = useState(false)
   const [inspectorWidth, setInspectorWidth] = useState(() => {
     const stored = Number(localStorage.getItem('editor-inspector-width'))
     if (Number.isNaN(stored) || stored <= 0) {
@@ -149,9 +151,11 @@ function EditorPage({
     setReservationPreviewAt(nextInputValue)
   }
 
+  const showLibrary = !isStaff && editorMode === 'edit'
+
   return (
     <DndContext onDragEnd={onDragEnd} sensors={sensors}>
-      <main className="h-screen overflow-hidden bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-3 sm:p-4">
+      <main className="flex min-h-screen flex-col overflow-x-hidden bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-3 sm:p-4 lg:h-screen lg:overflow-hidden">
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-white/60 bg-white/70 px-3 py-2 backdrop-blur">
           <button
             type="button"
@@ -235,6 +239,25 @@ function EditorPage({
             </button>
           </div>
 
+          <div className="ml-auto flex gap-2 lg:hidden">
+            {showLibrary ? (
+              <button
+                type="button"
+                className="min-h-11 rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
+                onClick={() => setIsMobileLibraryOpen(true)}
+              >
+                Library
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="min-h-11 rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+              onClick={() => setIsMobileInspectorOpen(true)}
+            >
+              Inspector
+            </button>
+          </div>
+
           {!isStaff ? (
             <div className="ml-auto flex flex-wrap gap-2">
               <button
@@ -296,32 +319,86 @@ function EditorPage({
         ) : null}
 
         <div
-          className="grid h-[calc(100%-52px)] [grid-template-columns:var(--editor-cols)] overflow-hidden rounded-2xl border border-white/60 bg-white/60 shadow-2xl backdrop-blur-md max-lg:grid-cols-1 max-lg:[grid-template-rows:var(--editor-mobile-rows)]"
+          className="grid flex-1 min-h-0 [grid-template-columns:var(--editor-cols)] overflow-hidden rounded-2xl border border-white/60 bg-white/60 shadow-2xl backdrop-blur-md max-lg:grid-cols-1 max-lg:[grid-template-rows:var(--editor-mobile-rows)]"
           style={{
-            '--editor-cols':
-              !isStaff && editorMode === 'edit'
-                ? `300px 1fr 10px ${inspectorWidth}px`
-                : `1fr 10px ${inspectorWidth}px`,
-            '--editor-mobile-rows':
-              !isStaff && editorMode === 'edit'
-                ? `105px minmax(0, 1fr) 10px ${inspectorHeight}px`
-                : `minmax(0, 1fr) 10px ${inspectorHeight}px`,
+            '--editor-cols': showLibrary
+              ? `300px 1fr 10px ${inspectorWidth}px`
+              : `1fr 10px ${inspectorWidth}px`,
+            '--editor-mobile-rows': 'minmax(0, 1fr)',
           }}
         >
-          {!isStaff && editorMode === 'edit' ? <ObjectLibrary /> : null}
+          {showLibrary ? (
+            <div className="hidden lg:block">
+              <ObjectLibrary />
+            </div>
+          ) : null}
           <CanvasEditor />
-          <div className="relative flex h-full items-stretch justify-center bg-slate-100/80 max-lg:h-full max-lg:w-full">
+          <div className="relative hidden h-full items-stretch justify-center bg-slate-100/80 lg:flex">
             <button
               type="button"
-              className="h-full w-full touch-none border-slate-200 bg-slate-100/80 hover:bg-slate-200/70 lg:cursor-col-resize lg:border-l lg:border-r max-lg:cursor-row-resize max-lg:border-y"
+              className="h-full w-full touch-none border-l border-r border-slate-200 bg-slate-100/80 hover:bg-slate-200/70 lg:cursor-col-resize"
               aria-label="Resize inspector panel"
               onPointerDown={startInspectorResize}
             >
               <span className="sr-only">Drag to resize inspector panel</span>
             </button>
           </div>
-          <InspectorPanel role={role} />
+          <div className="hidden lg:block">
+            <InspectorPanel role={role} />
+          </div>
         </div>
+
+        {isMobileLibraryOpen ? (
+          <div
+            className="fixed inset-0 z-50 flex items-end bg-slate-900/40 lg:hidden"
+            onClick={() => setIsMobileLibraryOpen(false)}
+          >
+            <div
+              className="h-[80vh] w-full overflow-hidden rounded-t-2xl border border-slate-200 bg-white"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                <span className="text-sm font-semibold text-slate-700">Object Library</span>
+                <button
+                  type="button"
+                  className="rounded-md bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700"
+                  onClick={() => setIsMobileLibraryOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+              <div className="h-[calc(80vh-52px)]">
+                <ObjectLibrary />
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {isMobileInspectorOpen ? (
+          <div
+            className="fixed inset-0 z-50 flex items-end bg-slate-900/40 lg:hidden"
+            onClick={() => setIsMobileInspectorOpen(false)}
+          >
+            <div
+              className="h-[75vh] w-full overflow-hidden rounded-t-2xl border border-slate-200 bg-white"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                <span className="text-sm font-semibold text-slate-700">Inspector</span>
+                <button
+                  type="button"
+                  className="rounded-md bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700"
+                  onClick={() => setIsMobileInspectorOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+              <div className="h-[calc(75vh-52px)]">
+                <InspectorPanel role={role} />
+              </div>
+            </div>
+          </div>
+        ) : null}
       </main>
     </DndContext>
   )

@@ -79,9 +79,9 @@ function FloorManagementPage({
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-6">
+    <main className="min-h-screen bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-4 sm:p-6">
       <section className="mx-auto max-w-5xl rounded-2xl border border-white/70 bg-white/75 p-6 shadow-2xl backdrop-blur">
-        <div className="mb-5 flex items-center justify-between">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-extrabold text-slate-800">
               {currentRestaurantName} Management
@@ -285,7 +285,7 @@ function FloorManagementPage({
                 ) : null}
                 <p className="text-xs text-slate-500">Updated: {new Date(floor.updatedAt).toLocaleString()}</p>
 
-                <div className={`mt-3 grid gap-2 ${isStaff ? 'grid-cols-1' : 'grid-cols-4'}`}>
+                <div className={`mt-3 grid gap-2 ${isStaff ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-4'}`}>
                   <button
                     type="button"
                     className="rounded-md bg-sky-600 px-2 py-1 text-xs font-semibold text-white hover:bg-sky-500"

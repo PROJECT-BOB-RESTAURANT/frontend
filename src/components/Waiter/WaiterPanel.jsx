@@ -606,13 +606,13 @@ export const WaiterPanel = () => {
 
   if (!waiterTableId || !table) {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-6">
+      <main className="min-h-screen bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-4 sm:p-6">
         <section className="mx-auto max-w-3xl rounded-2xl border border-white/70 bg-white/80 p-6 shadow-2xl backdrop-blur">
           <h1 className="text-xl font-bold text-slate-800">Waiter Table Manager</h1>
           <p className="mt-2 text-sm text-slate-500">No table selected. Return to view mode and pick a table.</p>
           <button
             type="button"
-            className="mt-4 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
+            className="mt-4 w-full rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 sm:w-auto"
             onClick={backToEditorFromWaiter}
           >
             Back To Floor View
@@ -623,7 +623,7 @@ export const WaiterPanel = () => {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-6">
+    <main className="min-h-screen bg-gradient-to-br from-amber-50 via-sky-50 to-emerald-100 p-4 sm:p-6">
       <section className="mx-auto max-w-6xl rounded-2xl border border-white/70 bg-white/80 p-6 shadow-2xl backdrop-blur">
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <button
