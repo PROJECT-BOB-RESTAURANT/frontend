@@ -1274,7 +1274,7 @@ export const WaiterPanel = () => {
                       />
                     </div>
 
-                    <div className="mt-2 flex gap-2">
+                    <div className="mt-2 flex flex-wrap gap-2">
                       <button
                         type="button"
                         className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200"
@@ -1288,17 +1288,17 @@ export const WaiterPanel = () => {
                         }}
                       >
                         -
-                          <button
-                            type="button"
-                            className="w-full rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 sm:ml-auto sm:w-auto"
+                      </button>
+                      <button
+                        type="button"
                         className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200"
                         onClick={() => updateOrderLine(order, { quantity: order.quantity + 1 })}
                       >
                         +
-                          <button
-                            type="button"
-                            className="w-full rounded-md bg-rose-100 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-200 sm:w-auto"
-                        className="ml-auto rounded-md bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-200"
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full rounded-md bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-200 sm:ml-auto sm:w-auto"
                         onClick={() => deleteOrderLine(order)}
                       >
                         Remove
