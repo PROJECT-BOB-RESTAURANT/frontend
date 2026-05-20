@@ -328,7 +328,7 @@ function EditorPage({
           }}
         >
           {showLibrary ? (
-            <div className="hidden lg:block">
+            <div className="hidden min-h-0 lg:block">
               <ObjectLibrary />
             </div>
           ) : null}
@@ -343,7 +343,7 @@ function EditorPage({
               <span className="sr-only">Drag to resize inspector panel</span>
             </button>
           </div>
-          <div className="hidden lg:block">
+          <div className="hidden min-h-0 lg:block">
             <InspectorPanel role={role} />
           </div>
         </div>
@@ -354,7 +354,7 @@ function EditorPage({
             onClick={() => setIsMobileLibraryOpen(false)}
           >
             <div
-              className="h-[80vh] w-full overflow-hidden rounded-t-2xl border border-slate-200 bg-white"
+              className="h-[80vh] max-h-[calc(100vh-1rem)] w-full overflow-hidden rounded-t-2xl border border-slate-200 bg-white"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
@@ -367,7 +367,7 @@ function EditorPage({
                   Close
                 </button>
               </div>
-              <div className="h-[calc(80vh-52px)]">
+              <div className="h-[calc(80vh-52px)] min-h-0">
                 <ObjectLibrary />
               </div>
             </div>
@@ -380,7 +380,7 @@ function EditorPage({
             onClick={() => setIsMobileInspectorOpen(false)}
           >
             <div
-              className="h-[75vh] w-full overflow-hidden rounded-t-2xl border border-slate-200 bg-white"
+              className="h-[75vh] max-h-[calc(100vh-1rem)] w-full overflow-hidden rounded-t-2xl border border-slate-200 bg-white"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
@@ -393,7 +393,7 @@ function EditorPage({
                   Close
                 </button>
               </div>
-              <div className="h-[calc(75vh-52px)]">
+              <div className="h-[calc(75vh-52px)] min-h-0">
                 <InspectorPanel role={role} />
               </div>
             </div>

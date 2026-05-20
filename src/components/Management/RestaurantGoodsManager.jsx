@@ -122,7 +122,7 @@ export const RestaurantGoodsManager = () => {
                     updateOpeningHoursDay(entry.day, { close: event.target.value })
                   }
                 />
-                <label className="flex items-center gap-1 text-[11px] font-semibold text-slate-600">
+                <label className="flex min-w-0 items-center gap-1 text-[11px] font-semibold text-slate-600 sm:justify-self-end">
                   <input
                     type="checkbox"
                     checked={entry.isClosed}
@@ -182,7 +182,7 @@ export const RestaurantGoodsManager = () => {
                 disabled={overrideClosed}
                 onChange={(event) => setOverrideClose(event.target.value)}
               />
-              <label className="shrink-0 whitespace-nowrap px-1 text-[11px] font-semibold text-slate-600">
+              <label className="flex min-w-0 items-center gap-1 px-1 text-[11px] font-semibold text-slate-600">
                 <input
                   type="checkbox"
                   checked={overrideClosed}

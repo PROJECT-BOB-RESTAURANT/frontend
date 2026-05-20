@@ -15,7 +15,7 @@ export const ObjectLibrary = () => {
   const isTable = selectedObject ? isTableObjectType(selectedObject.type) : false
 
   return (
-    <aside className="flex h-full flex-col overflow-hidden border-r border-slate-200 bg-white/70 backdrop-blur">
+    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-r border-slate-200 bg-white/70 backdrop-blur">
       <div className="border-b border-slate-200 px-4 py-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
           Object Library
@@ -23,7 +23,7 @@ export const ObjectLibrary = () => {
         <p className="mt-1 text-xs text-slate-500">Drag items onto the floor.</p>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto p-3">
+      <div className="flex-1 min-h-0 space-y-3 overflow-y-auto p-3">
         <div className="grid grid-cols-1 gap-2">
           {OBJECT_LIBRARY.map((item) => (
             <LibraryItem key={item.id} item={item} />

@@ -248,14 +248,14 @@ function AdminUsersPage({ onBack }) {
               }}
             >
               <input
-                className="h-10 min-w-[180px] flex-1 rounded-lg border border-slate-300 px-3 outline-none ring-orange-200 transition focus:border-orange-500 focus:ring-2"
+                className="h-10 min-w-0 flex-1 rounded-lg border border-slate-300 px-3 outline-none ring-orange-200 transition focus:border-orange-500 focus:ring-2 sm:min-w-[180px]"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search users"
               />
               <button
                 type="submit"
-                className="h-10 rounded-lg bg-slate-900 px-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="h-10 w-full rounded-lg bg-slate-900 px-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 disabled={isLoadingUsers}
               >
                 {isLoadingUsers ? 'Loading...' : 'Search'}

@@ -125,15 +125,13 @@ export const CanvasEditor = () => {
         >
           +
         </button>
-        {editorMode === 'view' ? (
-          <button
-            type="button"
-            className="rounded-md bg-sky-600 px-3 py-1 text-xs font-semibold text-white hover:bg-sky-500"
-            onClick={restoreView}
-          >
-            Restore View
-          </button>
-        ) : null}
+        <button
+          type="button"
+          className="rounded-md bg-sky-600 px-3 py-1 text-xs font-semibold text-white hover:bg-sky-500"
+          onClick={restoreView}
+        >
+          Restore View
+        </button>
       </div>
 
       <div

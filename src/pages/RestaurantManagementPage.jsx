@@ -80,10 +80,10 @@ function RestaurantManagementPage({
             <p className="text-sm text-slate-500">Choose a restaurant and continue through one focused management menu.</p>
           </div>
           {!isStaff ? (
-            <div className="flex items-center gap-2">
+            <div className="flex w-full items-center gap-2 sm:w-auto">
               <button
                 type="button"
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 onClick={onCreateRestaurant}
                 disabled={isBackendLoading}
               >

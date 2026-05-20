@@ -111,7 +111,7 @@ function WorkersManagementPage({
           </div>
           <button
             type="button"
-            className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
+            className="w-full rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 sm:w-auto"
             onClick={onBack}
           >
             Back To Floors
@@ -141,7 +141,7 @@ function WorkersManagementPage({
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Available Users</h2>
 
             <form
-              className="mt-3 flex gap-2"
+              className="mt-3 flex flex-wrap gap-2"
               onSubmit={(event) => {
                 event.preventDefault()
                 loadUsers(query)
@@ -156,7 +156,7 @@ function WorkersManagementPage({
               />
               <button
                 type="submit"
-                className="rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700"
+                className="w-full rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700 sm:w-auto"
                 disabled={loadingUsers}
               >
                 {loadingUsers ? 'Searching...' : 'Search'}

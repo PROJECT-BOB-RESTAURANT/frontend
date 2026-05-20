@@ -90,7 +90,7 @@ function FloorManagementPage({
           </div>
           <button
             type="button"
-            className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
+            className="w-full rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 sm:w-auto"
             onClick={onBackToRestaurants}
           >
             Back To Restaurants
@@ -211,7 +211,7 @@ function FloorManagementPage({
             <div className="mt-3">
               <button
                 type="button"
-                className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 onClick={onCreateFloor}
                 disabled={isBackendLoading}
               >

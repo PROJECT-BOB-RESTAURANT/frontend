@@ -646,7 +646,7 @@ export const WaiterPanel = () => {
 
           <button
             type="button"
-            className="ml-auto rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500"
+            className="w-full rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 sm:ml-auto sm:w-auto"
             onClick={() =>
               setWaiterActiveSection(activeSection === 'orders' ? 'reservations' : 'orders')
             }
@@ -934,7 +934,7 @@ export const WaiterPanel = () => {
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <label className="text-xs font-semibold text-slate-600">Tip</label>
             <input
-              className="w-28 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-xs sm:w-28"
               type="number"
               min="0"
               step="0.01"
@@ -995,7 +995,7 @@ export const WaiterPanel = () => {
               <div className="flex flex-wrap items-center gap-2">
                 <label className="text-xs font-semibold text-slate-600">Split count</label>
                 <input
-                  className="w-20 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                  className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-xs sm:w-20"
                   type="number"
                   min="2"
                   max="12"
@@ -1014,7 +1014,7 @@ export const WaiterPanel = () => {
                     <p className="text-[11px] font-semibold text-slate-600">Guest {index + 1}</p>
                     <div className="mt-1 flex items-center gap-2">
                       <input
-                        className="w-24 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                        className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-xs sm:w-24"
                         type="number"
                         min="0"
                         step="0.01"
@@ -1088,7 +1088,7 @@ export const WaiterPanel = () => {
         <div className="mb-4 flex justify-end">
           <button
             type="button"
-            className="rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-500"
+            className="w-full rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-500 sm:w-auto"
             onClick={clearOrders}
           >
             Clear Table Orders
@@ -1239,7 +1239,7 @@ export const WaiterPanel = () => {
                         Total: ${(order.quantity * Math.max(0, Number(order.unitPrice ?? 0))).toFixed(2)}
                       </span>
                       <select
-                        className="ml-auto rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs sm:ml-auto"
                         value={order.status}
                         onChange={(event) =>
                           updateOrderLine(order, { status: event.target.value })
@@ -1261,7 +1261,7 @@ export const WaiterPanel = () => {
                       Placed by: {order.placedByWorkerName ?? 'Unassigned'}
                     </p>
 
-                    <div className="mt-2 max-w-[140px]">
+                    <div className="mt-2 max-w-full sm:max-w-[140px]">
                       <input
                         className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
                         type="number"
@@ -1288,16 +1288,16 @@ export const WaiterPanel = () => {
                         }}
                       >
                         -
-                      </button>
-                      <button
-                        type="button"
+                          <button
+                            type="button"
+                            className="w-full rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 sm:ml-auto sm:w-auto"
                         className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200"
                         onClick={() => updateOrderLine(order, { quantity: order.quantity + 1 })}
                       >
                         +
-                      </button>
-                      <button
-                        type="button"
+                          <button
+                            type="button"
+                            className="w-full rounded-md bg-rose-100 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-200 sm:w-auto"
                         className="ml-auto rounded-md bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-200"
                         onClick={() => deleteOrderLine(order)}
                       >

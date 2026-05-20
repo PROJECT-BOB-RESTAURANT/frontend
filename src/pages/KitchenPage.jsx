@@ -61,6 +61,16 @@ function KitchenPage() {
   const [selectedLineId, setSelectedLineId] = useState(null)
   const [includeServed, setIncludeServed] = useState(false)
   const [isMobileDetailsOpen, setIsMobileDetailsOpen] = useState(false)
+  const [isDesktopDetailsOpen, setIsDesktopDetailsOpen] = useState(true)
+
+  const toggleTicketManager = () => {
+    if (typeof window !== 'undefined' && window.matchMedia?.('(min-width: 1024px)').matches) {
+      setIsDesktopDetailsOpen((current) => !current)
+      return
+    }
+
+    setIsMobileDetailsOpen((current) => !current)
+  }
 
   const tableLookup = useMemo(() => {
     const byTableId = new Map()
@@ -107,6 +117,18 @@ function KitchenPage() {
   useEffect(() => {
     loadKitchenQueue().catch(() => {})
   }, [currentRestaurantId, includeServed])
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setIsMobileDetailsOpen(false)
+        setIsDesktopDetailsOpen(true)
+      }
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   useEffect(() => {
     if (!currentRestaurantId) return undefined
@@ -242,10 +264,10 @@ function KitchenPage() {
 
           <button
             type="button"
-            className="min-h-11 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 lg:hidden"
-            onClick={() => setIsMobileDetailsOpen(true)}
+            className="min-h-11 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+            onClick={toggleTicketManager}
           >
-            Ticket Manager
+            {isMobileDetailsOpen || isDesktopDetailsOpen ? 'Hide Ticket Manager' : 'Ticket Manager'}
           </button>
         </div>
 
@@ -263,7 +285,10 @@ function KitchenPage() {
           <p className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{feedback}</p>
         ) : null}
 
-        <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+        <div
+          className="grid gap-4 lg:grid-cols-[var(--kitchen-cols)]"
+          style={{ '--kitchen-cols': isDesktopDetailsOpen ? '1.15fr 0.85fr' : '1fr' }}
+        >
           <section className="space-y-3">
             {visibleLines.length > 0 ? (
               visibleLines.map((line) => {
@@ -327,7 +352,7 @@ function KitchenPage() {
             )}
           </section>
 
-          <div className="hidden lg:block">{detailsPanel}</div>
+          {isDesktopDetailsOpen ? <div className="hidden lg:block">{detailsPanel}</div> : null}
         </div>
 
         {isMobileDetailsOpen ? (
@@ -336,7 +361,7 @@ function KitchenPage() {
             onClick={() => setIsMobileDetailsOpen(false)}
           >
             <div
-              className="h-[75vh] w-full overflow-hidden rounded-t-2xl border border-slate-200 bg-white"
+              className="h-[75vh] max-h-[calc(100vh-1rem)] w-full overflow-hidden rounded-t-2xl border border-slate-200 bg-white"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
